@@ -3,81 +3,21 @@ import { Play, RotateCcw, Share2, Trophy, Palette } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
-  {
-    id: 1,
-    name: "Orange Sunset",
-    image: "/images/puzzle1.jpg"
-  },
-  {
-    id: 2,
-    name: "Citrus Burst",
-    image: "/images/puzzle2.jpg"
-  },
-  {
-    id: 3,
-    name: "Autumn Leaves",
-    image: "/images/puzzle3.jpg"
-  },
-  {
-    id: 4,
-    name: "Fire Glow",
-    image: "/images/puzzle4.jpg"
-  },
-  {
-    id: 5,
-    name: "Orange Slice",
-    image: "/images/puzzle5.jpg"
-  },
-  {
-    id: 6,
-    name: "Desert Sand",
-    image: "/images/puzzle6.jpg"
-  },
-  {
-    id: 7,
-    name: "Tangerine Dream",
-    image: "/images/puzzle7.jpg"
-  },
-  {
-    id: 8,
-    name: "Coral Reef",
-    image: "/images/puzzle8.jpg"
-  },
-  {
-    id: 9,
-    name: "Peach Fusion",
-    image: "/images/puzzle9.jpg"
-  },
-  {
-    id: 10,
-    name: "Amber Glow",
-    image: "/images/puzzle10.jpg"
-  },
-  {
-    id: 11,
-    name: "Pumpkin Spice",
-    image: "/images/puzzle11.jpg"
-  },
-  {
-    id: 12,
-    name: "Sunrise Burst",
-    image: "/images/puzzle12.jpg"
-  },
-  {
-    id: 13,
-    name: "Mandarin Mix",
-    image: "/images/puzzle13.jpg"
-  },
-  {
-    id: 14,
-    name: "Copper Shine",
-    image: "/images/puzzle14.jpg"
-  },
-  {
-    id: 15,
-    name: "Burnt Orange",
-    image: "/images/puzzle15.jpg"
-  }
+  { id: 1, image: "/images/puzzle1.jpg" },
+  { id: 2, image: "/images/puzzle2.jpg" },
+  { id: 3, image: "/images/puzzle3.jpg" },
+  { id: 4, image: "/images/puzzle4.jpg" },
+  { id: 5, image: "/images/puzzle5.jpg" },
+  { id: 6, image: "/images/puzzle6.jpg" },
+  { id: 7, image: "/images/puzzle7.jpg" },
+  { id: 8, image: "/images/puzzle8.jpg" },
+  { id: 9, image: "/images/puzzle9.jpg" },
+  { id: 10, image: "/images/puzzle10.jpg" },
+  { id: 11, image: "/images/puzzle11.jpg" },
+  { id: 12, image: "/images/puzzle12.jpg" },
+  { id: 13, image: "/images/puzzle13.jpg" },
+  { id: 14, image: "/images/puzzle14.jpg" },
+  { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
 const InflyncedPuzzle = () => {
@@ -563,9 +503,9 @@ const InflyncedPuzzle = () => {
           <div className="text-center text-white">
             <div className="mb-8">
               <div className="text-6xl mb-4">🧩</div>
-              <h2 className="text-xl mb-2">Orange Image Puzzle</h2>
+              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
               <p className="text-white/80 mb-6">
-                Solve an orange-themed image puzzle as fast as you can!
+                Solve an image puzzle as fast as you can!
               </p>
             </div>
             <button
@@ -581,7 +521,7 @@ const InflyncedPuzzle = () => {
         {gameState === 'playing' && (
           <div>
             <div className="mb-4 text-center">
-              <h3 className="text-white font-bold">{currentPuzzle?.name}</h3>
+              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
             </div>
             
             <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
