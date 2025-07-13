@@ -1,6 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Share2, Trophy, Palette } from 'lucide-react';
 
+// Farcaster SDK
+let sdk = null;
+try {
+  // Dynamically import SDK only if available
+  import('@farcaster/miniapp-sdk').then((module) => {
+    sdk = module.sdk;
+  }).catch(() => {
+    console.log('Farcaster SDK not available - running in standalone mode');
+  });
+} catch (e) {
+  console.log('Farcaster SDK not available - running in standalone mode');
+}
+
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
   { id: 1, image: "/images/puzzle1.jpg" },
@@ -47,6 +60,31 @@ const InflyncedPuzzle = () => {
     } catch (e) {
       console.log('Audio not supported');
     }
+  }, []);
+
+  // Initialize Farcaster SDK and call ready
+  useEffect(() => {
+    const initializeFarcasterSDK = async () => {
+      try {
+        // Check if we're in Farcaster miniapp context
+        const isInFarcaster = window.parent !== window || 
+                            new URLSearchParams(window.location.search).get('miniApp') === 'true' ||
+                            window.location.pathname.includes('/mini');
+        
+        if (isInFarcaster) {
+          // Try to import and initialize SDK
+          const { sdk } = await import('@farcaster/miniapp-sdk');
+          
+          // Call ready to dismiss splash screen
+          await sdk.actions.ready();
+          console.log('Farcaster SDK initialized successfully');
+        }
+      } catch (error) {
+        console.log('Farcaster SDK not available or failed to initialize:', error);
+      }
+    };
+
+    initializeFarcasterSDK();
   }, []);
 
   const loadLeaderboard = useCallback(async () => {

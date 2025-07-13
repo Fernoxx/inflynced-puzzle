@@ -1,0 +1,36 @@
+{
+  "functions": {
+    "api/leaderboard.js": {
+      "maxDuration": 10
+    },
+    "api/submit-score.js": {
+      "maxDuration": 10
+    }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "installCommand": "npm install",
+  "devCommand": "npm start",
+  "framework": "create-react-app",
+  "rewrites": [
+    {
+      "source": "/images/(.*)",
+      "destination": "/images/$1"
+    },
+    {
+      "source": "/.well-known/farcaster.json",
+      "destination": "/public/.well-known/farcaster.json"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}

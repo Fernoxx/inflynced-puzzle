@@ -1,0 +1,14 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "InflyncedPuzzle",
+    "iconUrl": "https://inflynced-puzzle.vercel.app/logo.png",
+    "homeUrl": "https://inflynced-puzzle.vercel.app",
+    "imageUrl": "https://inflynced-puzzle.vercel.app/frame-image.png",
+    "buttonTitle": "🧩 Play Puzzle",
+    "splashImageUrl": "https://inflynced-puzzle.vercel.app/logo.png",
+    "splashBackgroundColor": "#B8460E",
+    "requiredChains": [],
+    "requiredCapabilities": []
+  }
+}
