@@ -1,14 +1,29 @@
 {
-  "miniapp": {
-    "version": "1",
+  "frame": {
     "name": "InflyncedPuzzle",
+    "version": "1",
     "iconUrl": "https://inflynced-puzzle.vercel.app/logo.png",
     "homeUrl": "https://inflynced-puzzle.vercel.app",
     "imageUrl": "https://inflynced-puzzle.vercel.app/frame-image.png",
-    "buttonTitle": "🧩 Play Puzzle",
+    "buttonTitle": "Play Inflynced Puzzle",
     "splashImageUrl": "https://inflynced-puzzle.vercel.app/logo.png",
-    "splashBackgroundColor": "#B8460E",
-    "requiredChains": [],
-    "requiredCapabilities": []
+    "splashBackgroundColor": "#ffc87c",
+    "webhookUrl": "https://inflynced-puzzle.vercel.app/api/webhook",
+    "subtitle": "Solve three orange sliding puzzles and challenge your friends",
+    "description": "Inflynced Puzzle is a sliding puzzle game for orangified frens. Solve three random orange themed puzzles as fast as possible then share your time with the Farcaster community.",
+    "primaryCategory": "games",
+    "tags": [
+      "puzzle",
+      "inflynce",
+      "orange",
+      "inflyncedpuzzle",
+      "inflynced"
+    ],
+    "tagline": "orange vibes"
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
+    "payload": "eyJkb21haW4iOiJpbmZseW5jZWQtcHV6emxlLnZlcmNlbC5hcHAifQ",
+    "signature": "MHhmOGU4Zjg5MTI0ZTM0NzJjYWUwYmYwNzAzYjMxNGFlZGYwNTQ0MDY3ZTljYjI4ZGNlNTQ0YjQxM2E2ZmE5MTJlNmY3NzE0Y2EwNDU3ZmU5ZWU4MDVlNzllZmFkOWU4NzY4NzQ1MWQzNTAxNWRiMDk5YjU0OThjZDI4NzcwMmE1MDFj"
   }
 }
