@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Share2, Trophy, Palette } from 'lucide-react';
+import { Play, Share2, Trophy, Palette } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -25,18 +25,18 @@ const InflyncedPuzzle = () => {
   const [currentPuzzle, setCurrentPuzzle] = useState(null);
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
-  const [moveHistory, setMoveHistory] = useState([]);
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [backgroundMode, setBackgroundMode] = useState('gradient');
+  const [backgroundMode, setBackgroundMode] = useState('solid'); // Start with solid dark orange
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [imageErrors, setImageErrors] = useState(new Set());
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -116,18 +116,68 @@ const InflyncedPuzzle = () => {
   const getUserProfile = useCallback(async () => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const username = urlParams.get('username') || prompt('Enter your Farcaster username:') || 'anonymous';
-      const fid = urlParams.get('fid') || Math.random().toString(36).substring(7);
       
-      setUserProfile({ username, fid });
+      // Check URL params first
+      let username = urlParams.get('username');
+      let fid = urlParams.get('fid');
+      
+      // If not in URL, check localStorage
+      if (!username) {
+        const stored = localStorage.getItem('inflynced-user-profile');
+        if (stored) {
+          const storedProfile = JSON.parse(stored);
+          username = storedProfile.username;
+          fid = storedProfile.fid;
+        }
+      }
+      
+      // If still no username, prompt user
+      if (!username) {
+        username = prompt('Enter your Farcaster username:') || 'anonymous';
+      }
+      
+      // Generate FID if not available
+      if (!fid) {
+        fid = Math.random().toString(36).substring(7);
+      }
+      
+      const profile = { username, fid };
+      
+      // Save to localStorage for future visits
+      localStorage.setItem('inflynced-user-profile', JSON.stringify(profile));
+      
+      setUserProfile(profile);
     } catch (error) {
       console.log('Failed to get user profile:', error);
-      setUserProfile({ 
+      const fallbackProfile = { 
         username: 'anonymous', 
         fid: Math.random().toString(36).substring(7) 
-      });
+      };
+      localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
+      setUserProfile(fallbackProfile);
     }
   }, []);
+
+  // Change username function
+  const changeUsername = useCallback(() => {
+    const newUsername = prompt('Enter your new Farcaster username:', userProfile?.username || '');
+    if (newUsername && newUsername.trim()) {
+      const newProfile = { 
+        username: newUsername.trim(), 
+        fid: userProfile?.fid || Math.random().toString(36).substring(7) 
+      };
+      localStorage.setItem('inflynced-user-profile', JSON.stringify(newProfile));
+      setUserProfile(newProfile);
+    }
+  }, [userProfile]);
+
+  // Clear stored username
+  const clearUsername = useCallback(() => {
+    if (confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
+      localStorage.removeItem('inflynced-user-profile');
+      getUserProfile(); // This will prompt for new username
+    }
+  }, [getUserProfile]);
 
   // Load data on component mount
   useEffect(() => {
@@ -284,7 +334,6 @@ const InflyncedPuzzle = () => {
     
     setBoard(shuffledBoard);
     setEmptyPos(emptyPos);
-    setMoveHistory([]);
     setProgress(calculateProgress(shuffledBoard));
     setStartTime(Date.now());
     setCurrentTime(0);
@@ -299,18 +348,12 @@ const InflyncedPuzzle = () => {
     
     if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
       const newBoard = board.map(r => [...r]);
-      const moveData = {
-        fromPos: { row, col },
-        toPos: { ...emptyPos },
-        tile: board[row][col]
-      };
       
       newBoard[emptyPos.row][emptyPos.col] = board[row][col];
       newBoard[row][col] = null;
       
       setBoard(newBoard);
       setEmptyPos({ row, col });
-      setMoveHistory(prev => [...prev, moveData]);
       
       const newProgress = calculateProgress(newBoard);
       setProgress(newProgress);
@@ -336,25 +379,6 @@ const InflyncedPuzzle = () => {
     }
   }, [gameState, emptyPos, board, playSound, checkWin, calculateProgress, startTime, userProfile, submitScore]);
 
-  const undoMove = useCallback(() => {
-    if (moveHistory.length === 0 || gameState !== 'playing') return;
-    
-    const lastMove = moveHistory[moveHistory.length - 1];
-    const newBoard = board.map(r => [...r]);
-    
-    newBoard[lastMove.fromPos.row][lastMove.fromPos.col] = lastMove.tile;
-    newBoard[lastMove.toPos.row][lastMove.toPos.col] = null;
-    
-    setBoard(newBoard);
-    setEmptyPos(lastMove.fromPos);
-    setMoveHistory(prev => prev.slice(0, -1));
-    
-    const newProgress = calculateProgress(newBoard);
-    setProgress(newProgress);
-    
-    playSound(330, 0.1);
-  }, [moveHistory, board, gameState, playSound, calculateProgress]);
-
   const shareResult = useCallback(() => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     const text = `I solved the puzzle in ${timeInSeconds} seconds.\nCan you beat my time?`;
@@ -376,12 +400,13 @@ const InflyncedPuzzle = () => {
     return (time / 1000).toFixed(1);
   };
 
-  const backgroundStyle = backgroundMode === 'gradient' 
+  // REVERSED: Now starts with solid dark orange, switches to gradient
+  const backgroundStyle = backgroundMode === 'solid' 
     ? {
-        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
+        backgroundColor: '#B8460E', // Dark shaded orange
       }
     : {
-        backgroundColor: '#E9520B',
+        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
       };
 
   // Get tile style for image pieces
@@ -398,6 +423,11 @@ const InflyncedPuzzle = () => {
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat'
     };
+  };
+
+  // Handle image loading errors
+  const handleImageError = (imagePath) => {
+    setImageErrors(prev => new Set([...prev, imagePath]));
   };
 
   return (
@@ -420,8 +450,19 @@ const InflyncedPuzzle = () => {
       ))}
 
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
+        {/* Header with Logo */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo.png" 
+              alt="InflyncedPuzzle Logo" 
+              className="w-8 h-8 rounded-lg"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={() => setShowLeaderboard(!showLeaderboard)}
@@ -430,13 +471,34 @@ const InflyncedPuzzle = () => {
               <Trophy size={20} />
             </button>
             <button
-              onClick={() => setBackgroundMode(backgroundMode === 'gradient' ? 'solid' : 'gradient')}
+              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
               className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
+              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
             >
               <Palette size={20} />
             </button>
           </div>
         </div>
+
+        {/* User Profile Section */}
+        {userProfile && (
+          <div className="mb-4 text-center">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+              <span className="text-white/80 text-sm">Playing as:</span>
+              <button
+                onClick={changeUsername}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  clearUsername();
+                }}
+                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
+                title="Click to change username • Right-click to clear stored username"
+              >
+                @{userProfile.username}
+              </button>
+            </div>
+          </div>
+        )}
 
         {gameState === 'playing' && (
           <div className="mb-4">
@@ -537,27 +599,28 @@ const InflyncedPuzzle = () => {
                     style={tile ? getTileStyle(tile) : {}}
                     onClick={() => makeMove(rowIndex, colIndex)}
                   >
-                    {tile && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xs bg-black/50 px-1 rounded">
+                    {tile && !imageErrors.has(tile.image) && (
+                      <div className="w-full h-full relative">
+                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
                           {tile.value}
                         </span>
+                        <img 
+                          src={tile.image} 
+                          alt={`Puzzle piece ${tile.value}`}
+                          className="hidden"
+                          onError={() => handleImageError(tile.image)}
+                          onLoad={(e) => e.target.style.display = 'none'}
+                        />
+                      </div>
+                    )}
+                    {tile && imageErrors.has(tile.image) && (
+                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
+                        <span className="text-white font-bold text-lg">{tile.value}</span>
                       </div>
                     )}
                   </div>
                 ))
               )}
-            </div>
-
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={undoMove}
-                disabled={moveHistory.length === 0}
-                className="bg-white/20 text-white px-4 py-2 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <RotateCcw size={18} />
-                Undo
-              </button>
             </div>
           </div>
         )}
