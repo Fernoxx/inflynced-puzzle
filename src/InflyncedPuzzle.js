@@ -21,7 +21,7 @@ const IMAGE_PUZZLES = [
 ];
 
 const InflyncedPuzzle = () => {
-  const [gameState, setGameState] = useState('menu'); // menu, playing, completed
+  const [gameState, setGameState] = useState('menu');
   const [currentPuzzle, setCurrentPuzzle] = useState(null);
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
@@ -29,7 +29,7 @@ const InflyncedPuzzle = () => {
   const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [backgroundMode, setBackgroundMode] = useState('solid'); // Start with solid dark orange
+  const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
@@ -41,7 +41,6 @@ const InflyncedPuzzle = () => {
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
 
-  // Initialize audio context
   useEffect(() => {
     try {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -50,7 +49,6 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Load leaderboard data
   const loadLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
     try {
@@ -74,7 +72,6 @@ const InflyncedPuzzle = () => {
     setIsLoadingLeaderboard(false);
   }, []);
 
-  // Submit score to leaderboard
   const submitScore = useCallback(async (time, username, fid) => {
     const newEntry = {
       username,
@@ -112,16 +109,13 @@ const InflyncedPuzzle = () => {
     }
   }, [loadLeaderboard]);
 
-  // Get user profile from Farcaster
   const getUserProfile = useCallback(async () => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Check URL params first
       let username = urlParams.get('username');
       let fid = urlParams.get('fid');
       
-      // If not in URL, check localStorage
       if (!username) {
         const stored = localStorage.getItem('inflynced-user-profile');
         if (stored) {
@@ -131,21 +125,16 @@ const InflyncedPuzzle = () => {
         }
       }
       
-      // If still no username, prompt user
       if (!username) {
-        username = prompt('Enter your Farcaster username:') || 'anonymous';
+        username = window.prompt('Enter your Farcaster username:') || 'anonymous';
       }
       
-      // Generate FID if not available
       if (!fid) {
         fid = Math.random().toString(36).substring(7);
       }
       
       const profile = { username, fid };
-      
-      // Save to localStorage for future visits
       localStorage.setItem('inflynced-user-profile', JSON.stringify(profile));
-      
       setUserProfile(profile);
     } catch (error) {
       console.log('Failed to get user profile:', error);
@@ -158,9 +147,8 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Change username function
   const changeUsername = useCallback(() => {
-    const newUsername = prompt('Enter your new Farcaster username:', userProfile?.username || '');
+    const newUsername = window.prompt('Enter your new Farcaster username:', userProfile?.username || '');
     if (newUsername && newUsername.trim()) {
       const newProfile = { 
         username: newUsername.trim(), 
@@ -171,21 +159,18 @@ const InflyncedPuzzle = () => {
     }
   }, [userProfile]);
 
-  // Clear stored username
   const clearUsername = useCallback(() => {
-    if (confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
+    if (window.confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
       localStorage.removeItem('inflynced-user-profile');
-      getUserProfile(); // This will prompt for new username
+      getUserProfile();
     }
   }, [getUserProfile]);
 
-  // Load data on component mount
   useEffect(() => {
     loadLeaderboard();
     getUserProfile();
   }, [loadLeaderboard, getUserProfile]);
 
-  // Simple sound effect generator
   const playSound = useCallback((frequency, duration = 0.1, type = 'sine') => {
     if (!audioContextRef.current) return;
     
@@ -209,7 +194,6 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Particle system for background animation
   useEffect(() => {
     const createParticle = () => ({
       id: Math.random(),
@@ -233,7 +217,6 @@ const InflyncedPuzzle = () => {
     return () => clearInterval(animateParticles);
   }, []);
 
-  // Timer
   useEffect(() => {
     if (gameState === 'playing' && startTime) {
       timerRef.current = setInterval(() => {
@@ -255,7 +238,7 @@ const InflyncedPuzzle = () => {
       board[i] = [];
       for (let j = 0; j < 3; j++) {
         if (i === 2 && j === 2) {
-          board[i][j] = null; // Empty space
+          board[i][j] = null;
         } else {
           board[i][j] = {
             value: tileIndex + 1,
@@ -392,7 +375,7 @@ const InflyncedPuzzle = () => {
       });
     } else {
       navigator.clipboard.writeText(`${text}\n${url}`);
-      alert('Result copied to clipboard!');
+      window.alert('Result copied to clipboard!');
     }
   }, [totalTime]);
 
@@ -400,32 +383,29 @@ const InflyncedPuzzle = () => {
     return (time / 1000).toFixed(1);
   };
 
-  // REVERSED: Now starts with solid dark orange, switches to gradient
   const backgroundStyle = backgroundMode === 'solid' 
     ? {
-        backgroundColor: '#B8460E', // Dark shaded orange
+        backgroundColor: '#B8460E',
       }
     : {
         background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
       };
 
-  // Get tile style for image pieces
   const getTileStyle = (tile) => {
     if (!tile) return {};
     
-    const tileSize = 100; // Each tile is 100px
+    const tileSize = 100;
     const backgroundX = -(tile.correctPos.col * tileSize);
     const backgroundY = -(tile.correctPos.row * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '300px 300px', // 3x3 grid = 300px total
+      backgroundSize: '300px 300px',
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat'
     };
   };
 
-  // Handle image loading errors
   const handleImageError = (imagePath) => {
     setImageErrors(prev => new Set([...prev, imagePath]));
   };
@@ -450,7 +430,6 @@ const InflyncedPuzzle = () => {
       ))}
 
       <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
-        {/* Header with Logo */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <img 
@@ -480,7 +459,6 @@ const InflyncedPuzzle = () => {
           </div>
         </div>
 
-        {/* User Profile Section */}
         {userProfile && (
           <div className="mb-4 text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
