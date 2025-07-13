@@ -1,19 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Share2, Trophy, Palette } from 'lucide-react';
 
-// Farcaster SDK
-let sdk = null;
-try {
-  // Dynamically import SDK only if available
-  import('@farcaster/miniapp-sdk').then((module) => {
-    sdk = module.sdk;
-  }).catch(() => {
-    console.log('Farcaster SDK not available - running in standalone mode');
-  });
-} catch (e) {
-  console.log('Farcaster SDK not available - running in standalone mode');
-}
-
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
   { id: 1, image: "/images/puzzle1.jpg" },
@@ -39,7 +26,6 @@ const InflyncedPuzzle = () => {
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
   const [startTime, setStartTime] = useState(null);
-  const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState('solid');
@@ -66,21 +52,16 @@ const InflyncedPuzzle = () => {
   useEffect(() => {
     const initializeFarcasterSDK = async () => {
       try {
-        // Check if we're in Farcaster miniapp context
-        const isInFarcaster = window.parent !== window || 
-                            new URLSearchParams(window.location.search).get('miniApp') === 'true' ||
-                            window.location.pathname.includes('/mini');
+        // Try to import and initialize SDK
+        const { sdk } = await import('@farcaster/miniapp-sdk');
         
-        if (isInFarcaster) {
-          // Try to import and initialize SDK
-          const { sdk } = await import('@farcaster/miniapp-sdk');
-          
-          // Call ready to dismiss splash screen
-          await sdk.actions.ready();
-          console.log('Farcaster SDK initialized successfully');
-        }
+        // Call ready to dismiss splash screen - this must always be called
+        await sdk.actions.ready();
+        console.log('Farcaster SDK initialized successfully');
       } catch (error) {
         console.log('Farcaster SDK not available or failed to initialize:', error);
+        // Even if SDK import fails, we should still signal that the app is ready
+        // This is important for when the app runs outside of Farcaster
       }
     };
 
@@ -386,7 +367,6 @@ const InflyncedPuzzle = () => {
         
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
-        setEndTime(Date.now());
         setGameState('completed');
         
         if (userProfile) {
