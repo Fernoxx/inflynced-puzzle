@@ -36,6 +36,8 @@ const InflyncedPuzzle = () => {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [imageErrors, setImageErrors] = useState(new Set());
+  const [sdkInstance, setSdkInstance] = useState(null);
+  const [isInFarcaster, setIsInFarcaster] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -52,21 +54,53 @@ const InflyncedPuzzle = () => {
   useEffect(() => {
     const initializeFarcasterSDK = async () => {
       try {
-        // Try to import and initialize SDK
+        // Import the SDK
         const { sdk } = await import('@farcaster/miniapp-sdk');
+        setSdkInstance(sdk);
+        setIsInFarcaster(true);
         
-        // Call ready to dismiss splash screen - this must always be called
+        // CRITICAL: Always call ready() - this dismisses the splash screen
         await sdk.actions.ready();
-        console.log('Farcaster SDK initialized successfully');
+        console.log('✓ Farcaster SDK ready() called successfully');
+        
+        // Get user profile from Farcaster context
+        if (sdk.context?.user) {
+          const farcasterUser = {
+            username: sdk.context.user.username || `user${sdk.context.user.fid}`,
+            fid: sdk.context.user.fid,
+            displayName: sdk.context.user.displayName,
+            pfp: sdk.context.user.pfp
+          };
+          setUserProfile(farcasterUser);
+          console.log('✓ Got Farcaster user:', farcasterUser);
+        }
+        
       } catch (error) {
         console.log('Farcaster SDK not available or failed to initialize:', error);
-        // Even if SDK import fails, we should still signal that the app is ready
-        // This is important for when the app runs outside of Farcaster
+        setIsInFarcaster(false);
+        // Fallback for non-Farcaster environments
+        getFallbackUserProfile();
       }
     };
 
     initializeFarcasterSDK();
   }, []);
+
+  const getFallbackUserProfile = () => {
+    // Fallback for when not in Farcaster
+    const stored = localStorage.getItem('inflynced-user-profile');
+    if (stored) {
+      setUserProfile(JSON.parse(stored));
+    } else {
+      const username = window.prompt('Enter your username:') || 'anonymous';
+      const fallbackProfile = { 
+        username, 
+        fid: Math.random().toString(36).substring(7) 
+      };
+      localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
+      setUserProfile(fallbackProfile);
+    }
+  };
 
   const loadLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
@@ -128,46 +162,13 @@ const InflyncedPuzzle = () => {
     }
   }, [loadLeaderboard]);
 
-  const getUserProfile = useCallback(async () => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      let username = urlParams.get('username');
-      let fid = urlParams.get('fid');
-      
-      if (!username) {
-        const stored = localStorage.getItem('inflynced-user-profile');
-        if (stored) {
-          const storedProfile = JSON.parse(stored);
-          username = storedProfile.username;
-          fid = storedProfile.fid;
-        }
-      }
-      
-      if (!username) {
-        username = window.prompt('Enter your Farcaster username:') || 'anonymous';
-      }
-      
-      if (!fid) {
-        fid = Math.random().toString(36).substring(7);
-      }
-      
-      const profile = { username, fid };
-      localStorage.setItem('inflynced-user-profile', JSON.stringify(profile));
-      setUserProfile(profile);
-    } catch (error) {
-      console.log('Failed to get user profile:', error);
-      const fallbackProfile = { 
-        username: 'anonymous', 
-        fid: Math.random().toString(36).substring(7) 
-      };
-      localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
-      setUserProfile(fallbackProfile);
-    }
-  }, []);
-
   const changeUsername = useCallback(() => {
-    const newUsername = window.prompt('Enter your new Farcaster username:', userProfile?.username || '');
+    if (isInFarcaster) {
+      window.alert('Username is managed by Farcaster. Your current Farcaster username will be used.');
+      return;
+    }
+    
+    const newUsername = window.prompt('Enter your new username:', userProfile?.username || '');
     if (newUsername && newUsername.trim()) {
       const newProfile = { 
         username: newUsername.trim(), 
@@ -176,19 +177,23 @@ const InflyncedPuzzle = () => {
       localStorage.setItem('inflynced-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
     }
-  }, [userProfile]);
+  }, [userProfile, isInFarcaster]);
 
   const clearUsername = useCallback(() => {
+    if (isInFarcaster) {
+      window.alert('Username is managed by Farcaster.');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
       localStorage.removeItem('inflynced-user-profile');
-      getUserProfile();
+      getFallbackUserProfile();
     }
-  }, [getUserProfile]);
+  }, [isInFarcaster]);
 
   useEffect(() => {
     loadLeaderboard();
-    getUserProfile();
-  }, [loadLeaderboard, getUserProfile]);
+  }, [loadLeaderboard]);
 
   const playSound = useCallback((frequency, duration = 0.1, type = 'sine') => {
     if (!audioContextRef.current) return;
@@ -380,22 +385,58 @@ const InflyncedPuzzle = () => {
     }
   }, [gameState, emptyPos, board, playSound, checkWin, calculateProgress, startTime, userProfile, submitScore]);
 
-  const shareResult = useCallback(() => {
+  const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
-    const text = `I solved the puzzle in ${timeInSeconds} seconds.\nCan you beat my time?`;
-    const url = "https://inflynced-puzzle.vercel.app";
+    const appUrl = window.location.origin;
+    const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
-    if (navigator.share) {
-      navigator.share({
-        title: 'InflyncedPuzzle',
-        text: text,
-        url: url,
-      });
-    } else {
-      navigator.clipboard.writeText(`${text}\n${url}`);
-      window.alert('Result copied to clipboard!');
+    // Use Farcaster composeCast if available, otherwise fallback
+    if (sdkInstance && isInFarcaster) {
+      try {
+        const result = await sdkInstance.actions.composeCast({
+          text: text,
+          embeds: [appUrl]
+        });
+        
+        if (result?.cast) {
+          console.log('✓ Cast shared successfully:', result.cast.hash);
+        } else {
+          console.log('Cast sharing was cancelled');
+        }
+        return;
+      } catch (error) {
+        console.log('Failed to use Farcaster composeCast:', error);
+      }
     }
-  }, [totalTime]);
+    
+    // Fallback to Web Share API or clipboard
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'InflyncedPuzzle - I solved it!',
+          text: text,
+          url: appUrl,
+        });
+      } catch (error) {
+        console.log('Web Share cancelled or failed:', error);
+      }
+    } else {
+      // Clipboard fallback
+      try {
+        await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
+        window.alert('Result copied to clipboard!');
+      } catch (error) {
+        // Manual copy fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = `${text}\n\n${appUrl}`;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        window.alert('Result copied to clipboard!');
+      }
+    }
+  }, [totalTime, sdkInstance, isInFarcaster]);
 
   const formatTime = (time) => {
     return (time / 1000).toFixed(1);
@@ -488,10 +529,18 @@ const InflyncedPuzzle = () => {
                   clearUsername();
                 }}
                 className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
-                title="Click to change username • Right-click to clear stored username"
+                title={isInFarcaster 
+                  ? "Using your Farcaster username" 
+                  : "Click to change username • Right-click to clear stored username"
+                }
               >
                 @{userProfile.username}
               </button>
+              {isInFarcaster && (
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">
+                  FC
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -635,7 +684,7 @@ const InflyncedPuzzle = () => {
                 className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
               >
                 <Share2 size={20} />
-                Share Result
+                {isInFarcaster ? 'Share Cast' : 'Share Result'}
               </button>
               
               <button
