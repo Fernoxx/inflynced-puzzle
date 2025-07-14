@@ -38,6 +38,7 @@ const InflyncedPuzzle = () => {
   const [imageErrors, setImageErrors] = useState(new Set());
   const [sdkInstance, setSdkInstance] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -54,31 +55,43 @@ const InflyncedPuzzle = () => {
   useEffect(() => {
     const initializeFarcasterSDK = async () => {
       try {
+        console.log('🔄 Initializing Farcaster SDK...');
+        
         // Import the SDK
         const { sdk } = await import('@farcaster/miniapp-sdk');
         setSdkInstance(sdk);
-        setIsInFarcaster(true);
         
         // CRITICAL: Always call ready() - this dismisses the splash screen
         await sdk.actions.ready();
-        console.log('✓ Farcaster SDK ready() called successfully');
+        setSdkReady(true);
+        console.log('✅ Farcaster SDK ready() called successfully');
         
-        // Get user profile from Farcaster context
-        if (sdk.context?.user) {
-          const farcasterUser = {
-            username: sdk.context.user.username || `user${sdk.context.user.fid}`,
-            fid: sdk.context.user.fid,
-            displayName: sdk.context.user.displayName,
-            pfp: sdk.context.user.pfp
-          };
-          setUserProfile(farcasterUser);
-          console.log('✓ Got Farcaster user:', farcasterUser);
-        }
+        // Wait a moment for context to be available
+        setTimeout(() => {
+          console.log('🔍 Checking SDK context:', sdk.context);
+          
+          // Get user profile from Farcaster context
+          if (sdk.context?.user && sdk.context.user.fid) {
+            const farcasterUser = {
+              username: sdk.context.user.username || `user${sdk.context.user.fid}`,
+              fid: sdk.context.user.fid,
+              displayName: sdk.context.user.displayName,
+              pfp: sdk.context.user.pfp
+            };
+            setUserProfile(farcasterUser);
+            setIsInFarcaster(true);
+            console.log('✅ Got Farcaster user:', farcasterUser);
+          } else {
+            console.log('❌ No Farcaster user context found');
+            setIsInFarcaster(false);
+            getFallbackUserProfile();
+          }
+        }, 500);
         
       } catch (error) {
-        console.log('Farcaster SDK not available or failed to initialize:', error);
+        console.log('❌ Farcaster SDK not available or failed to initialize:', error);
         setIsInFarcaster(false);
-        // Fallback for non-Farcaster environments
+        setSdkReady(true); // Mark as ready even if SDK failed
         getFallbackUserProfile();
       }
     };
@@ -86,11 +99,14 @@ const InflyncedPuzzle = () => {
     initializeFarcasterSDK();
   }, []);
 
-  const getFallbackUserProfile = () => {
+  const getFallbackUserProfile = useCallback(() => {
+    console.log('🔄 Getting fallback user profile...');
     // Fallback for when not in Farcaster
     const stored = localStorage.getItem('inflynced-user-profile');
     if (stored) {
-      setUserProfile(JSON.parse(stored));
+      const profile = JSON.parse(stored);
+      setUserProfile(profile);
+      console.log('📱 Using stored profile:', profile);
     } else {
       const username = window.prompt('Enter your username:') || 'anonymous';
       const fallbackProfile = { 
@@ -99,29 +115,50 @@ const InflyncedPuzzle = () => {
       };
       localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
       setUserProfile(fallbackProfile);
+      console.log('👤 Created new profile:', fallbackProfile);
     }
-  };
+  }, []);
 
   const loadLeaderboard = useCallback(async () => {
+    console.log('🏆 Loading leaderboard...');
     setIsLoadingLeaderboard(true);
+    
     try {
       const response = await fetch('/api/leaderboard');
+      console.log('📡 Leaderboard API response:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        setLeaderboard(data);
+        console.log('✅ Leaderboard data:', data);
+        setLeaderboard(Array.isArray(data) ? data : []);
       } else {
+        console.log('❌ API failed, trying localStorage...');
         const stored = localStorage.getItem('inflynced-leaderboard');
         if (stored) {
-          setLeaderboard(JSON.parse(stored));
+          const data = JSON.parse(stored);
+          setLeaderboard(Array.isArray(data) ? data : []);
+        } else {
+          setLeaderboard([]);
         }
       }
     } catch (error) {
-      console.log('Failed to load leaderboard:', error);
+      console.log('❌ Failed to load leaderboard:', error);
       const stored = localStorage.getItem('inflynced-leaderboard');
       if (stored) {
-        setLeaderboard(JSON.parse(stored));
+        const data = JSON.parse(stored);
+        setLeaderboard(Array.isArray(data) ? data : []);
+      } else {
+        // Create some sample data for testing
+        const sampleData = [
+          { username: 'player1', fid: '1', time: 15.3, timestamp: Date.now(), avatar: '🧩' },
+          { username: 'player2', fid: '2', time: 18.7, timestamp: Date.now() - 1000, avatar: '🧩' },
+          { username: 'player3', fid: '3', time: 22.1, timestamp: Date.now() - 2000, avatar: '🧩' }
+        ];
+        setLeaderboard(sampleData);
+        localStorage.setItem('inflynced-leaderboard', JSON.stringify(sampleData));
       }
     }
+    
     setIsLoadingLeaderboard(false);
   }, []);
 
@@ -134,6 +171,8 @@ const InflyncedPuzzle = () => {
       avatar: "🧩"
     };
 
+    console.log('📊 Submitting score:', newEntry);
+
     try {
       const response = await fetch('/api/submit-score', {
         method: 'POST',
@@ -144,12 +183,13 @@ const InflyncedPuzzle = () => {
       });
 
       if (response.ok) {
+        console.log('✅ Score submitted to API');
         loadLeaderboard();
       } else {
         throw new Error('API submission failed');
       }
     } catch (error) {
-      console.log('Failed to submit to API, using localStorage:', error);
+      console.log('❌ Failed to submit to API, using localStorage:', error);
       const stored = localStorage.getItem('inflynced-leaderboard');
       const currentBoard = stored ? JSON.parse(stored) : [];
       
@@ -189,11 +229,14 @@ const InflyncedPuzzle = () => {
       localStorage.removeItem('inflynced-user-profile');
       getFallbackUserProfile();
     }
-  }, [isInFarcaster]);
+  }, [isInFarcaster, getFallbackUserProfile]);
 
+  // Load initial data
   useEffect(() => {
-    loadLeaderboard();
-  }, [loadLeaderboard]);
+    if (sdkReady) {
+      loadLeaderboard();
+    }
+  }, [loadLeaderboard, sdkReady]);
 
   const playSound = useCallback((frequency, duration = 0.1, type = 'sine') => {
     if (!audioContextRef.current) return;
@@ -399,7 +442,7 @@ const InflyncedPuzzle = () => {
         });
         
         if (result?.cast) {
-          console.log('✓ Cast shared successfully:', result.cast.hash);
+          console.log('✅ Cast shared successfully:', result.cast.hash);
         } else {
           console.log('Cast sharing was cancelled');
         }
@@ -468,6 +511,18 @@ const InflyncedPuzzle = () => {
   const handleImageError = (imagePath) => {
     setImageErrors(prev => new Set([...prev, imagePath]));
   };
+
+  // Don't render until SDK is ready
+  if (!sdkReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#B8460E' }}>
+        <div className="text-white text-center">
+          <div className="text-6xl mb-4">🧩</div>
+          <div className="text-xl">Loading InflyncedPuzzle...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -575,19 +630,19 @@ const InflyncedPuzzle = () => {
             
             {isLoadingLeaderboard ? (
               <div className="text-center text-white/70 py-4">
-                Loading scores...
+                <div className="animate-pulse">Loading scores...</div>
               </div>
-            ) : leaderboard.length > 0 ? (
-              <div className="space-y-2">
+            ) : leaderboard && leaderboard.length > 0 ? (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {leaderboard.map((entry, index) => (
                   <div key={`${entry.fid}-${entry.timestamp}`} className="flex items-center justify-between text-white/90 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="w-5 text-center font-bold">
                         {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                       </span>
-                      <span className="text-lg">{entry.avatar}</span>
+                      <span className="text-lg">{entry.avatar || '🧩'}</span>
                       <button 
-                        className="hover:text-white transition-colors hover:underline"
+                        className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
                         onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
                         title={`View @${entry.username}'s profile`}
                       >
@@ -600,7 +655,9 @@ const InflyncedPuzzle = () => {
               </div>
             ) : (
               <div className="text-center text-white/70 py-4">
-                No scores yet. Be the first to play!
+                <div className="text-4xl mb-2">🏆</div>
+                <div>No scores yet.</div>
+                <div className="text-sm">Be the first to play!</div>
               </div>
             )}
           </div>
