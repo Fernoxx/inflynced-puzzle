@@ -4,43 +4,46 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#E9520B" />
-    <meta name="description" content="InflyncedPuzzle - Image sliding puzzle game for Farcaster" />
+    <meta name="theme-color" content="#B8460E" />
+    <meta name="description" content="Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard." />
     
-    <!-- Open Graph Meta Tags for Farcaster -->
-    <meta property="og:title" content="InflyncedPuzzle" />
-    <meta property="og:description" content="Solve image sliding puzzles as fast as you can!" />
-    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
-    <meta property="og:url" content="https://inflynced-puzzle.vercel.app" />
+    <!-- Farcaster Mini App Meta Tags -->
+    <meta name="fc:miniapp" content='{
+      "version": "1",
+      "imageUrl": "https://inflynced-puzzle.vercel.app/images/puzzle1.jpg",
+      "button": {
+        "title": "🧩 Play Now",
+        "action": {
+          "type": "launch_frame",
+          "name": "InflyncedPuzzle",
+          "url": "https://inflynced-puzzle.vercel.app/",
+          "splashImageUrl": "https://inflynced-puzzle.vercel.app/logo.png",
+          "splashBackgroundColor": "#B8460E"
+        }
+      }
+    }' />
+    
+    <!-- Open Graph Meta Tags -->
     <meta property="og:type" content="website" />
+    <meta property="og:title" content="InflyncedPuzzle - Image Sliding Puzzle Game" />
+    <meta property="og:description" content="Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard." />
+    <meta property="og:image" content="%PUBLIC_URL%/images/puzzle1.jpg" />
+    <meta property="og:url" content="https://inflynced-puzzle.vercel.app/" />
+    <meta property="og:site_name" content="InflyncedPuzzle" />
     
-    <!-- Farcaster Frame Meta Tags -->
-    <meta property="fc:frame" content="vNext" />
-    <meta property="fc:frame:image" content="%PUBLIC_URL%/frame-image.png" />
-    <meta property="fc:frame:button:1" content="Play Puzzle" />
-    <meta property="fc:frame:button:1:action" content="link" />
-    <meta property="fc:frame:button:1:target" content="https://inflynced-puzzle.vercel.app" />
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InflyncedPuzzle - Image Sliding Puzzle Game" />
+    <meta name="twitter:description" content="Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/images/puzzle1.jpg" />
     
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     
-    <title>InflyncedPuzzle</title>
+    <title>InflyncedPuzzle - Image Sliding Puzzle Game</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              orange: {
-                primary: '#E9520B'
-              }
-            }
-          }
-        }
-      }
-    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
