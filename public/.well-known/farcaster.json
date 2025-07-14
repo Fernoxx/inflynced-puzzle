@@ -14,10 +14,6 @@
       "context.user"
     ],
     "description": "Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard.",
-    "category": "games",
-    "screenshots": [
-      "https://inflynced-puzzle.vercel.app/screenshot1.jpg",
-      "https://inflynced-puzzle.vercel.app/screenshot2.jpg"
-    ]
+    "category": "games"
   }
 }
