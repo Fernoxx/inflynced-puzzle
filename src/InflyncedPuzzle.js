@@ -151,6 +151,34 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
+  const loadStoredLeaderboard = useCallback(() => {
+    console.log('💾 Loading leaderboard from localStorage...');
+    const stored = localStorage.getItem('inflynced-leaderboard');
+    
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        console.log('📱 Found stored leaderboard:', data);
+        
+        if (Array.isArray(data) && data.length > 0) {
+          setLeaderboardSafely(data);
+        } else {
+          console.log('⚠️ Stored data is invalid, using sample data');
+          setLeaderboardSafely(SAMPLE_LEADERBOARD);
+          localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
+        }
+      } catch (e) {
+        console.log('❌ Error parsing stored leaderboard, using sample data:', e);
+        setLeaderboardSafely(SAMPLE_LEADERBOARD);
+        localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
+      }
+    } else {
+      console.log('📝 No stored leaderboard, creating sample data');
+      setLeaderboardSafely(SAMPLE_LEADERBOARD);
+      localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
+    }
+  }, [setLeaderboardSafely]);
+
   const loadLeaderboard = useCallback(async () => {
     console.log('🏆 loadLeaderboard called - loading data...');
     setIsLoadingLeaderboard(true);
@@ -187,34 +215,6 @@ const InflyncedPuzzle = () => {
     
     setIsLoadingLeaderboard(false);
   }, [setLeaderboardSafely, loadStoredLeaderboard]);
-
-  const loadStoredLeaderboard = useCallback(() => {
-    console.log('💾 Loading leaderboard from localStorage...');
-    const stored = localStorage.getItem('inflynced-leaderboard');
-    
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        console.log('📱 Found stored leaderboard:', data);
-        
-        if (Array.isArray(data) && data.length > 0) {
-          setLeaderboardSafely(data);
-        } else {
-          console.log('⚠️ Stored data is invalid, using sample data');
-          setLeaderboardSafely(SAMPLE_LEADERBOARD);
-          localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
-        }
-      } catch (e) {
-        console.log('❌ Error parsing stored leaderboard, using sample data:', e);
-        setLeaderboardSafely(SAMPLE_LEADERBOARD);
-        localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
-      }
-    } else {
-      console.log('📝 No stored leaderboard, creating sample data');
-      setLeaderboardSafely(SAMPLE_LEADERBOARD);
-      localStorage.setItem('inflynced-leaderboard', JSON.stringify(SAMPLE_LEADERBOARD));
-    }
-  }, [setLeaderboardSafely]);
 
   const submitScore = useCallback(async (time, username, fid) => {
     console.log('📊 submitScore called:', { time, username, fid });
