@@ -146,13 +146,13 @@ const InflyncedPuzzle = () => {
       console.log('✅ Setting leaderboard to new data:', newData);
       setLeaderboard(newData);
     } else {
-      console.log('❌ Invalid leaderboard data, keeping current:', leaderboard);
+      console.log('❌ Invalid leaderboard data, keeping current data');
       // Don't change the leaderboard if new data is invalid
     }
-  }, [leaderboard]);
+  }, []);
 
   const loadLeaderboard = useCallback(async () => {
-    console.log('🏆 loadLeaderboard called - current state:', leaderboard.length, 'items');
+    console.log('🏆 loadLeaderboard called - loading data...');
     setIsLoadingLeaderboard(true);
     
     try {
@@ -186,7 +186,7 @@ const InflyncedPuzzle = () => {
     }
     
     setIsLoadingLeaderboard(false);
-  }, [setLeaderboardSafely]);
+  }, [setLeaderboardSafely, loadStoredLeaderboard]);
 
   const loadStoredLeaderboard = useCallback(() => {
     console.log('💾 Loading leaderboard from localStorage...');
@@ -273,18 +273,14 @@ const InflyncedPuzzle = () => {
 
   const handleLeaderboardToggle = useCallback(() => {
     console.log('🏆 Leaderboard toggle clicked');
-    console.log('Current leaderboard state:', {
-      length: leaderboard.length,
-      data: leaderboard,
-      showing: showLeaderboard
-    });
+    console.log('Current leaderboard state has items:', leaderboard.length > 0);
     
     setShowLeaderboard(prev => {
       const newValue = !prev;
       console.log('🔄 Toggling leaderboard visibility:', prev, '->', newValue);
       return newValue;
     });
-  }, [leaderboard, showLeaderboard]);
+  }, [leaderboard.length]);
 
   const changeUsername = useCallback(() => {
     if (isInFarcaster) {
