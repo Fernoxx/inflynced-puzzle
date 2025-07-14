@@ -9,7 +9,6 @@
     "splashImageUrl": "https://inflynced-puzzle.vercel.app/logo.png",
     "splashBackgroundColor": "#ffc87c",
     "webhookUrl": "https://inflynced-puzzle.vercel.app/api/webhook",
-    "subtitle": "Solve three orange sliding puzzles and challenge your friends",
     "description": "Inflynced Puzzle is a sliding puzzle game for orangified frens. Solve three random orange themed puzzles as fast as possible then share your time with the Farcaster community.",
     "primaryCategory": "games",
     "tags": [
