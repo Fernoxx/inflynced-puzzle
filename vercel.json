@@ -7,9 +7,9 @@
       "maxDuration": 10
     }
   },
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "build",
-  "installCommand": "npm install",
+  "installCommand": "npm install --force",
   "devCommand": "npm start",
   "framework": "create-react-app",
   "rewrites": [
