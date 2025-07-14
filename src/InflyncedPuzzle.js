@@ -42,8 +42,6 @@ const InflyncedPuzzle = () => {
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
-  const contextCheckAttempts = useRef(0);
-  const maxContextChecks = 10;
 
   useEffect(() => {
     try {
@@ -115,51 +113,7 @@ const InflyncedPuzzle = () => {
     }
   }, [createSampleLeaderboard]);
 
-  // Better Farcaster context checking with polling
-  const checkFarcasterContext = useCallback((sdk) => {
-    console.log(`🔍 Checking Farcaster context (attempt ${contextCheckAttempts.current + 1}/${maxContextChecks})`);
-    console.log('SDK object:', sdk);
-    console.log('SDK context:', sdk.context);
-    
-    if (sdk.context) {
-      console.log('SDK context user:', sdk.context.user);
-      console.log('SDK context location:', sdk.context.location);
-      console.log('SDK context client:', sdk.context.client);
-    }
-    
-    // Check if we have user context
-    if (sdk.context?.user?.fid) {
-      const farcasterUser = {
-        username: sdk.context.user.username || `user${sdk.context.user.fid}`,
-        fid: sdk.context.user.fid,
-        displayName: sdk.context.user.displayName || sdk.context.user.username,
-        pfp: sdk.context.user.pfp
-      };
-      
-      console.log('✅ Found Farcaster user:', farcasterUser);
-      setUserProfile(farcasterUser);
-      setIsInFarcaster(true);
-      setInitializationComplete(true);
-      return true;
-    }
-    
-    contextCheckAttempts.current++;
-    
-    if (contextCheckAttempts.current < maxContextChecks) {
-      // Continue checking
-      setTimeout(() => checkFarcasterContext(sdk), 1000);
-      return false;
-    } else {
-      // Max attempts reached, fall back to non-Farcaster mode
-      console.log('❌ Max context check attempts reached, using fallback');
-      setIsInFarcaster(false);
-      setInitializationComplete(true);
-      getFallbackUserProfile();
-      return false;
-    }
-  }, [getFallbackUserProfile]);
-
-  // Initialize Farcaster SDK
+  // Initialize Farcaster SDK with proper context reading
   useEffect(() => {
     const initializeFarcasterSDK = async () => {
       try {
@@ -169,14 +123,36 @@ const InflyncedPuzzle = () => {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         setSdkInstance(sdk);
         
-        // CRITICAL: Always call ready() - this dismisses the splash screen
+        // CRITICAL: Always call ready() first - this dismisses the splash screen
         await sdk.actions.ready();
         console.log('✅ Farcaster SDK ready() called successfully');
         
-        // Start checking for context
-        setTimeout(() => {
-          checkFarcasterContext(sdk);
-        }, 500);
+        // Now get the context - THE KEY FIX: await sdk.context
+        console.log('🔍 Getting SDK context...');
+        const context = await sdk.context;
+        console.log('📋 Full SDK context:', context);
+        
+        // Extract real user data from context
+        if (context?.user) {
+          console.log('👤 Raw user data from context:', context.user);
+          
+          const farcasterUser = {
+            username: context.user.username || `user${context.user.fid}`,
+            fid: context.user.fid,
+            displayName: context.user.displayName || context.user.username,
+            pfpUrl: context.user.pfpUrl || context.user.pfp // Handle both property names
+          };
+          
+          console.log('✅ Processed Farcaster user:', farcasterUser);
+          setUserProfile(farcasterUser);
+          setIsInFarcaster(true);
+        } else {
+          console.log('❌ No user in context, using fallback');
+          setIsInFarcaster(false);
+          getFallbackUserProfile();
+        }
+        
+        setInitializationComplete(true);
         
       } catch (error) {
         console.log('❌ Farcaster SDK not available:', error);
@@ -187,7 +163,7 @@ const InflyncedPuzzle = () => {
     };
 
     initializeFarcasterSDK();
-  }, [checkFarcasterContext, getFallbackUserProfile]);
+  }, [getFallbackUserProfile]);
 
   const loadLeaderboard = useCallback(async () => {
     console.log('🏆 Loading leaderboard...');
@@ -207,10 +183,10 @@ const InflyncedPuzzle = () => {
         const data = await response.json();
         console.log('✅ Leaderboard data from API:', data);
         
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           setLeaderboard(data);
         } else {
-          console.log('❌ API returned non-array data, using fallback');
+          console.log('❌ API returned empty/invalid data, using fallback');
           loadFallbackLeaderboard();
         }
       } else {
@@ -226,9 +202,14 @@ const InflyncedPuzzle = () => {
   }, [loadFallbackLeaderboard]);
 
   const submitScore = useCallback(async (time, username, fid) => {
+    if (!username || !fid) {
+      console.log('❌ Missing username or fid for score submission');
+      return;
+    }
+
     const newEntry = {
-      username: username || 'anonymous',
-      fid: fid || Math.random().toString(36).substring(7),
+      username: username,
+      fid: fid,
       time: parseFloat((time / 1000).toFixed(1)),
       timestamp: Date.now(),
       avatar: "🧩"
@@ -236,16 +217,19 @@ const InflyncedPuzzle = () => {
 
     console.log('📊 Submitting score:', newEntry);
 
-    // Always update localStorage first to ensure we have the data
-    const currentBoard = [...leaderboard, newEntry]
-      .sort((a, b) => a.time - b.time)
-      .slice(0, 10);
-    
-    setLeaderboard(currentBoard);
-    localStorage.setItem('inflynced-leaderboard', JSON.stringify(currentBoard));
-    console.log('✅ Updated local leaderboard:', currentBoard);
+    // Update leaderboard immediately (optimistic update)
+    setLeaderboard(prevLeaderboard => {
+      const updated = [...prevLeaderboard, newEntry]
+        .sort((a, b) => a.time - b.time)
+        .slice(0, 10);
+      
+      // Also save to localStorage
+      localStorage.setItem('inflynced-leaderboard', JSON.stringify(updated));
+      console.log('✅ Updated local leaderboard immediately:', updated);
+      return updated;
+    });
 
-    // Try to submit to API but don't fail if it doesn't work
+    // Try to submit to API in background
     try {
       const response = await fetch('/api/submit-score', {
         method: 'POST',
@@ -257,16 +241,16 @@ const InflyncedPuzzle = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Score submitted to API:', result);
-        // Refresh from API to get latest data
-        setTimeout(() => loadLeaderboard(), 1000);
+        console.log('✅ Score submitted to API successfully:', result);
+        // Optionally refresh from API to get latest data
+        setTimeout(() => loadLeaderboard(), 500);
       } else {
-        console.log('❌ API submission failed, using local data');
+        console.log('❌ API submission failed, but local data is already updated');
       }
     } catch (error) {
-      console.log('❌ Network error submitting score, using local data:', error);
+      console.log('❌ Network error submitting score, but local data is already updated:', error);
     }
-  }, [leaderboard, loadLeaderboard]);
+  }, [loadLeaderboard]);
 
   const changeUsername = useCallback(() => {
     if (isInFarcaster) {
@@ -483,8 +467,11 @@ const InflyncedPuzzle = () => {
         setTotalTime(finalTime);
         setGameState('completed');
         
-        if (userProfile) {
+        if (userProfile && userProfile.username && userProfile.fid) {
+          console.log('🎯 Game won! Submitting score for user:', userProfile);
           submitScore(finalTime, userProfile.username, userProfile.fid);
+        } else {
+          console.log('❌ Cannot submit score - missing user profile:', userProfile);
         }
         
         setTimeout(() => playSound(523, 0.2), 0);
@@ -586,7 +573,7 @@ const InflyncedPuzzle = () => {
           <div className="text-6xl mb-4 animate-bounce">🧩</div>
           <div className="text-xl mb-2">Loading InflyncedPuzzle...</div>
           <div className="text-sm opacity-70">
-            {isInFarcaster ? 'Connecting to Farcaster...' : 'Initializing app...'}
+            Detecting Farcaster context...
           </div>
         </div>
       </div>
@@ -629,6 +616,7 @@ const InflyncedPuzzle = () => {
             <button
               onClick={() => {
                 console.log('🏆 Leaderboard button clicked');
+                console.log('Current leaderboard state:', leaderboard);
                 setShowLeaderboard(!showLeaderboard);
               }}
               className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
@@ -657,17 +645,21 @@ const InflyncedPuzzle = () => {
                 }}
                 className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
                 title={isInFarcaster 
-                  ? "Using your Farcaster username" 
+                  ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
                   : "Click to change username • Right-click to clear stored username"
                 }
               >
                 @{userProfile.username}
               </button>
               {isInFarcaster && (
-                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded">
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded" title="Connected to Farcaster">
                   FC
                 </span>
               )}
+            </div>
+            {/* Debug info for development */}
+            <div className="text-xs text-white/50 mt-1">
+              FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
             </div>
           </div>
         )}
@@ -691,7 +683,7 @@ const InflyncedPuzzle = () => {
           <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <h3 className="text-white font-bold mb-3 flex items-center gap-2">
               <Trophy size={18} />
-              Leaderboard
+              Leaderboard ({leaderboard.length} scores)
               <button
                 onClick={() => {
                   console.log('🔄 Refresh button clicked');
@@ -711,7 +703,6 @@ const InflyncedPuzzle = () => {
             ) : leaderboard && leaderboard.length > 0 ? (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {leaderboard.map((entry, index) => {
-                  console.log('Rendering leaderboard entry:', entry, index);
                   return (
                     <div key={`${entry.fid}-${entry.timestamp}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
                       <div className="flex items-center gap-2">
