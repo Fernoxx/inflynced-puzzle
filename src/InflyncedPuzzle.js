@@ -53,6 +53,68 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
+  const createNewProfile = useCallback(() => {
+    const username = window.prompt('Enter your username:') || 'anonymous';
+    const fallbackProfile = { 
+      username, 
+      fid: Math.random().toString(36).substring(7) 
+    };
+    localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
+    setUserProfile(fallbackProfile);
+    console.log('👤 Created new profile:', fallbackProfile);
+  }, []);
+
+  const getFallbackUserProfile = useCallback(() => {
+    console.log('🔄 Getting fallback user profile...');
+    const stored = localStorage.getItem('inflynced-user-profile');
+    if (stored) {
+      try {
+        const profile = JSON.parse(stored);
+        setUserProfile(profile);
+        console.log('📱 Using stored profile:', profile);
+      } catch (e) {
+        console.log('❌ Error parsing stored profile:', e);
+        createNewProfile();
+      }
+    } else {
+      createNewProfile();
+    }
+  }, [createNewProfile]);
+
+  const createSampleLeaderboard = useCallback(() => {
+    const sampleData = [
+      { username: 'puzzlemaster', fid: 'sample1', time: 12.4, timestamp: Date.now() - 3600000, avatar: '🧩' },
+      { username: 'speedsolver', fid: 'sample2', time: 15.8, timestamp: Date.now() - 7200000, avatar: '🧩' },
+      { username: 'braingamer', fid: 'sample3', time: 18.2, timestamp: Date.now() - 10800000, avatar: '🧩' }
+    ];
+    
+    setLeaderboard(sampleData);
+    localStorage.setItem('inflynced-leaderboard', JSON.stringify(sampleData));
+    console.log('🎯 Created sample leaderboard:', sampleData);
+  }, []);
+
+  const loadFallbackLeaderboard = useCallback(() => {
+    console.log('📱 Loading fallback leaderboard...');
+    const stored = localStorage.getItem('inflynced-leaderboard');
+    
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        if (Array.isArray(data)) {
+          setLeaderboard(data);
+          console.log('✅ Loaded leaderboard from localStorage:', data);
+        } else {
+          createSampleLeaderboard();
+        }
+      } catch (e) {
+        console.log('❌ Error parsing stored leaderboard:', e);
+        createSampleLeaderboard();
+      }
+    } else {
+      createSampleLeaderboard();
+    }
+  }, [createSampleLeaderboard]);
+
   // Better Farcaster context checking with polling
   const checkFarcasterContext = useCallback((sdk) => {
     console.log(`🔍 Checking Farcaster context (attempt ${contextCheckAttempts.current + 1}/${maxContextChecks})`);
@@ -95,7 +157,7 @@ const InflyncedPuzzle = () => {
       getFallbackUserProfile();
       return false;
     }
-  }, []);
+  }, [getFallbackUserProfile]);
 
   // Initialize Farcaster SDK
   useEffect(() => {
@@ -125,35 +187,7 @@ const InflyncedPuzzle = () => {
     };
 
     initializeFarcasterSDK();
-  }, [checkFarcasterContext]);
-
-  const getFallbackUserProfile = useCallback(() => {
-    console.log('🔄 Getting fallback user profile...');
-    const stored = localStorage.getItem('inflynced-user-profile');
-    if (stored) {
-      try {
-        const profile = JSON.parse(stored);
-        setUserProfile(profile);
-        console.log('📱 Using stored profile:', profile);
-      } catch (e) {
-        console.log('❌ Error parsing stored profile:', e);
-        createNewProfile();
-      }
-    } else {
-      createNewProfile();
-    }
-  }, []);
-
-  const createNewProfile = () => {
-    const username = window.prompt('Enter your username:') || 'anonymous';
-    const fallbackProfile = { 
-      username, 
-      fid: Math.random().toString(36).substring(7) 
-    };
-    localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
-    setUserProfile(fallbackProfile);
-    console.log('👤 Created new profile:', fallbackProfile);
-  };
+  }, [checkFarcasterContext, getFallbackUserProfile]);
 
   const loadLeaderboard = useCallback(async () => {
     console.log('🏆 Loading leaderboard...');
@@ -189,41 +223,7 @@ const InflyncedPuzzle = () => {
     }
     
     setIsLoadingLeaderboard(false);
-  }, []);
-
-  const loadFallbackLeaderboard = () => {
-    console.log('📱 Loading fallback leaderboard...');
-    const stored = localStorage.getItem('inflynced-leaderboard');
-    
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        if (Array.isArray(data)) {
-          setLeaderboard(data);
-          console.log('✅ Loaded leaderboard from localStorage:', data);
-        } else {
-          createSampleLeaderboard();
-        }
-      } catch (e) {
-        console.log('❌ Error parsing stored leaderboard:', e);
-        createSampleLeaderboard();
-      }
-    } else {
-      createSampleLeaderboard();
-    }
-  };
-
-  const createSampleLeaderboard = () => {
-    const sampleData = [
-      { username: 'puzzlemaster', fid: 'sample1', time: 12.4, timestamp: Date.now() - 3600000, avatar: '🧩' },
-      { username: 'speedsolver', fid: 'sample2', time: 15.8, timestamp: Date.now() - 7200000, avatar: '🧩' },
-      { username: 'braingamer', fid: 'sample3', time: 18.2, timestamp: Date.now() - 10800000, avatar: '🧩' }
-    ];
-    
-    setLeaderboard(sampleData);
-    localStorage.setItem('inflynced-leaderboard', JSON.stringify(sampleData));
-    console.log('🎯 Created sample leaderboard:', sampleData);
-  };
+  }, [loadFallbackLeaderboard]);
 
   const submitScore = useCallback(async (time, username, fid) => {
     const newEntry = {
