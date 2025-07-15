@@ -136,26 +136,71 @@ const InflyncedPuzzle = () => {
     initializeFarcasterSDK();
   }, [getFallbackUserProfile]);
 
-  // Remove all the complex functions that could be causing crashes
-  // const getCurrentLeaderboard = useCallback(() => {
-  //   try {
-  //     const stored = localStorage.getItem('inflynced-leaderboard');
-  //     if (stored) {
-  //       const parsed = JSON.parse(stored);
-  //       if (Array.isArray(parsed) && parsed.length > 0) {
-  //         return parsed;
-  //       }
-  //     }
-  //   } catch (e) {
-  //     console.log('Error reading stored scores, using default');
-  //   }
-  //   return FIXED_LEADERBOARD;
-  // }, []);
+  // Get real leaderboard scores, remove duplicates, keep best score per user
+  const getRealLeaderboard = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('inflynced-leaderboard');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Remove duplicates - keep only best score per user
+          const userBestScores = {};
+          parsed.forEach(entry => {
+            if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
+              userBestScores[entry.fid] = entry;
+            }
+          });
+          
+          // Convert back to array and sort
+          return Object.values(userBestScores)
+            .sort((a, b) => a.time - b.time)
+            .slice(0, 10);
+        }
+      }
+    } catch (e) {
+      console.log('Error reading scores');
+    }
+    return [];
+  }, []);
 
-  // Simple score submission that just logs
+  // Update score submission to replace existing user score
   const submitScore = useCallback((time, username, fid) => {
-    console.log('📊 Score submitted:', { time: (time/1000).toFixed(1), username, fid });
-    // Just log it, don't try to save or update anything
+    console.log('📊 Submitting score:', { time: (time/1000).toFixed(1), username, fid });
+    
+    if (!username || !fid) return;
+
+    const newEntry = {
+      username: username,
+      fid: fid,
+      time: parseFloat((time / 1000).toFixed(1)),
+      timestamp: Date.now(),
+      avatar: "🧩"
+    };
+
+    try {
+      // Get existing scores
+      const stored = localStorage.getItem('inflynced-leaderboard');
+      let currentScores = [];
+      if (stored) {
+        currentScores = JSON.parse(stored);
+      }
+      
+      // Remove any existing scores for this user
+      currentScores = currentScores.filter(score => score.fid !== fid);
+      
+      // Add the new score
+      currentScores.push(newEntry);
+      
+      // Sort and keep top 10
+      const updatedScores = currentScores
+        .sort((a, b) => a.time - b.time)
+        .slice(0, 10);
+      
+      localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedScores));
+      console.log('✅ Score saved, replaced any existing score for user');
+    } catch (error) {
+      console.log('❌ Error saving score:', error);
+    }
   }, []);
 
   const changeUsername = useCallback(() => {
@@ -479,9 +524,6 @@ const InflyncedPuzzle = () => {
     );
   }
 
-  // Get leaderboard data for display - REMOVED TO PREVENT CRASHES
-  // const leaderboardData = getCurrentLeaderboard();
-
   return (
     <div 
       className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board"
@@ -580,60 +622,34 @@ const InflyncedPuzzle = () => {
           <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <h3 className="text-white font-bold mb-3 flex items-center gap-2">
               <Trophy size={18} />
-              Leaderboard (3 scores)
+              Leaderboard ({getRealLeaderboard().length} scores)
             </h3>
             
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              <div className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 text-center font-bold">🥇</span>
-                  <span className="text-lg">🧩</span>
-                  <button 
-                    className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
-                    onClick={() => window.open(`https://warpcast.com/puzzlemaster`, '_blank')}
-                  >
-                    @puzzlemaster
-                  </button>
-                </div>
-                <span className="font-mono font-bold">12.4s</span>
-              </div>
-              
-              <div className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 text-center font-bold">🥈</span>
-                  <span className="text-lg">🧩</span>
-                  <button 
-                    className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
-                    onClick={() => window.open(`https://warpcast.com/speedsolver`, '_blank')}
-                  >
-                    @speedsolver
-                  </button>
-                </div>
-                <span className="font-mono font-bold">15.8s</span>
-              </div>
-              
-              <div className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 text-center font-bold">🥉</span>
-                  <span className="text-lg">🧩</span>
-                  <button 
-                    className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
-                    onClick={() => window.open(`https://warpcast.com/braingamer`, '_blank')}
-                  >
-                    @braingamer
-                  </button>
-                </div>
-                <span className="font-mono font-bold">18.2s</span>
-              </div>
-              
-              {userProfile && gameState === 'completed' && (
-                <div className="flex items-center justify-between text-white/90 text-sm bg-green-500/10 rounded p-2 border border-green-500/20">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 text-center font-bold">4</span>
-                    <span className="text-lg">🧩</span>
-                    <span className="text-green-300">@{userProfile.username}</span>
+              {getRealLeaderboard().length > 0 ? (
+                getRealLeaderboard().map((entry, index) => (
+                  <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 text-center font-bold">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                      </span>
+                      <span className="text-lg">🧩</span>
+                      <button 
+                        className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
+                        onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
+                        title={`View @${entry.username}'s profile`}
+                      >
+                        @{entry.username}
+                      </button>
+                    </div>
+                    <span className="font-mono font-bold">{entry.time}s</span>
                   </div>
-                  <span className="font-mono font-bold text-green-300">{formatTime(totalTime)}s</span>
+                ))
+              ) : (
+                <div className="text-center text-white/70 py-8">
+                  <div className="text-4xl mb-2">🏆</div>
+                  <div className="font-bold">No scores yet!</div>
+                  <div className="text-sm">Play a game to set the first record!</div>
                 </div>
               )}
             </div>
