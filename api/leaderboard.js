@@ -1,5 +1,5 @@
-// Vercel serverless function for leaderboard
-let leaderboardData = [];
+// Vercel serverless function for shared leaderboard
+let sharedLeaderboard = [];
 
 export default function handler(req, res) {
   // Set CORS headers
@@ -13,12 +13,31 @@ export default function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Return current leaderboard (top 10, sorted by time)
-    const sortedLeaderboard = leaderboardData
+    // Filter out demo data and remove duplicates
+    const realScores = sharedLeaderboard.filter(entry => 
+      entry.username !== 'puzzlemaster' && 
+      entry.username !== 'speedsolver' && 
+      entry.username !== 'braingamer' &&
+      !entry.fid?.includes('demo') &&
+      !entry.fid?.includes('sample')
+    );
+    
+    // Remove duplicates - keep only best score per user
+    const userBestScores = {};
+    realScores.forEach(entry => {
+      if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
+        userBestScores[entry.fid] = entry;
+      }
+    });
+    
+    const finalScores = Object.values(userBestScores)
       .sort((a, b) => a.time - b.time)
       .slice(0, 10);
     
-    res.status(200).json(sortedLeaderboard);
+    // Update the shared leaderboard with cleaned data
+    sharedLeaderboard = finalScores;
+    
+    res.status(200).json(finalScores);
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }
