@@ -20,13 +20,6 @@ const IMAGE_PUZZLES = [
   { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
-// Fixed leaderboard data that never changes
-const FIXED_LEADERBOARD = [
-  { username: 'puzzlemaster', fid: 'demo1', time: 12.4, timestamp: Date.now() - 3600000, avatar: '🧩' },
-  { username: 'speedsolver', fid: 'demo2', time: 15.8, timestamp: Date.now() - 7200000, avatar: '🧩' },
-  { username: 'braingamer', fid: 'demo3', time: 18.2, timestamp: Date.now() - 10800000, avatar: '🧩' }
-];
-
 const InflyncedPuzzle = () => {
   const [gameState, setGameState] = useState('menu');
   const [currentPuzzle, setCurrentPuzzle] = useState(null);
@@ -44,6 +37,8 @@ const InflyncedPuzzle = () => {
   const [sdkInstance, setSdkInstance] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
   const [initializationComplete, setInitializationComplete] = useState(false);
+  const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -136,27 +131,40 @@ const InflyncedPuzzle = () => {
     initializeFarcasterSDK();
   }, [getFallbackUserProfile]);
 
-  // Clear demo data and get real leaderboard scores only
-  const getRealLeaderboard = useCallback(() => {
+  // Load shared leaderboard from API with localStorage fallback
+  const loadSharedLeaderboard = useCallback(async () => {
+    setIsLoadingLeaderboard(true);
+    try {
+      const response = await fetch('/api/leaderboard');
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setSharedLeaderboard(data);
+          console.log('✅ Loaded shared leaderboard from API:', data.length, 'scores');
+          setIsLoadingLeaderboard(false);
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('❌ API failed, trying localStorage fallback:', error);
+    }
+    
+    // Fallback to localStorage if API fails
     try {
       const stored = localStorage.getItem('inflynced-leaderboard');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out demo users and keep only real users
+        if (Array.isArray(parsed)) {
+          // Filter out demo data
           const realScores = parsed.filter(entry => 
             entry.username !== 'puzzlemaster' && 
             entry.username !== 'speedsolver' && 
             entry.username !== 'braingamer' &&
-            entry.fid !== 'demo1' &&
-            entry.fid !== 'demo2' &&
-            entry.fid !== 'demo3' &&
-            entry.fid !== 'sample1' &&
-            entry.fid !== 'sample2' &&
-            entry.fid !== 'sample3'
+            !entry.fid?.includes('demo') &&
+            !entry.fid?.includes('sample')
           );
           
-          // Remove duplicates - keep only best score per user
+          // Remove duplicates
           const userBestScores = {};
           realScores.forEach(entry => {
             if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
@@ -164,33 +172,25 @@ const InflyncedPuzzle = () => {
             }
           });
           
-          // Convert back to array and sort
           const finalScores = Object.values(userBestScores)
             .sort((a, b) => a.time - b.time)
             .slice(0, 10);
           
-          // Save cleaned data back to localStorage
-          localStorage.setItem('inflynced-leaderboard', JSON.stringify(finalScores));
-          
-          return finalScores;
+          setSharedLeaderboard(finalScores);
+          console.log('📱 Loaded leaderboard from localStorage fallback:', finalScores.length, 'scores');
         }
       }
     } catch (e) {
-      console.log('Error reading scores');
+      console.log('❌ localStorage fallback also failed');
+      setSharedLeaderboard([]);
     }
-    return [];
-  }, []);0, 10);
-        }
-      }
-    } catch (e) {
-      console.log('Error reading scores');
-    }
-    return [];
+    
+    setIsLoadingLeaderboard(false);
   }, []);
 
-  // Update score submission to replace existing user score
-  const submitScore = useCallback((time, username, fid) => {
-    console.log('📊 Submitting score:', { time: (time/1000).toFixed(1), username, fid });
+  // Submit score to shared API with localStorage fallback
+  const submitScore = useCallback(async (time, username, fid) => {
+    console.log('📊 Submitting score to shared leaderboard:', { time: (time/1000).toFixed(1), username, fid });
     
     if (!username || !fid) return;
 
@@ -202,31 +202,72 @@ const InflyncedPuzzle = () => {
       avatar: "🧩"
     };
 
+    let apiSuccess = false;
+    
+    // Try API first
     try {
-      // Get existing scores
-      const stored = localStorage.getItem('inflynced-leaderboard');
-      let currentScores = [];
-      if (stored) {
-        currentScores = JSON.parse(stored);
+      const response = await fetch('/api/submit-score', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newEntry),
+      });
+
+      if (response.ok) {
+        console.log('✅ Score submitted to shared API');
+        apiSuccess = true;
+        // Reload leaderboard to show updated scores
+        setTimeout(() => loadSharedLeaderboard(), 500);
       }
-      
-      // Remove any existing scores for this user
-      currentScores = currentScores.filter(score => score.fid !== fid);
-      
-      // Add the new score
-      currentScores.push(newEntry);
-      
-      // Sort and keep top 10
-      const updatedScores = currentScores
-        .sort((a, b) => a.time - b.time)
-        .slice(0, 10);
-      
-      localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedScores));
-      console.log('✅ Score saved, replaced any existing score for user');
     } catch (error) {
-      console.log('❌ Error saving score:', error);
+      console.log('❌ API submission failed:', error);
     }
-  }, []);
+    
+    // If API fails, update localStorage as fallback
+    if (!apiSuccess) {
+      try {
+        const stored = localStorage.getItem('inflynced-leaderboard');
+        let currentScores = [];
+        if (stored) {
+          currentScores = JSON.parse(stored);
+        }
+        
+        // Remove demo data and existing user scores
+        currentScores = currentScores.filter(entry => 
+          entry.username !== 'puzzlemaster' && 
+          entry.username !== 'speedsolver' && 
+          entry.username !== 'braingamer' &&
+          !entry.fid?.includes('demo') &&
+          !entry.fid?.includes('sample') &&
+          entry.fid !== fid
+        );
+        
+        // Add new score
+        currentScores.push(newEntry);
+        
+        // Sort and save
+        const updatedScores = currentScores
+          .sort((a, b) => a.time - b.time)
+          .slice(0, 10);
+        
+        localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedScores));
+        console.log('📱 Score saved to localStorage fallback');
+        
+        // Update display
+        setSharedLeaderboard(updatedScores);
+      } catch (error) {
+        console.log('❌ localStorage fallback also failed:', error);
+      }
+    }
+  }, [loadSharedLeaderboard]);
+
+  // Load leaderboard when component mounts
+  useEffect(() => {
+    if (initializationComplete) {
+      loadSharedLeaderboard();
+    }
+  }, [initializationComplete, loadSharedLeaderboard]);
 
   const changeUsername = useCallback(() => {
     if (isInFarcaster) {
@@ -556,241 +597,4 @@ const InflyncedPuzzle = () => {
     >
       {particles.map(particle => (
         <div
-          key={particle.id}
-          className="absolute rounded-full bg-white pointer-events-none"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: `${particle.size}px`,
-            height: `${particle.size}px`,
-            opacity: particle.opacity,
-          }}
-        />
-      ))}
-
-      <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="InflyncedPuzzle Logo" 
-              className="w-8 h-8 rounded-lg"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-            >
-              <Trophy size={20} />
-            </button>
-            <button
-              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
-            >
-              <Palette size={20} />
-            </button>
-          </div>
-        </div>
-
-        {userProfile && (
-          <div className="mb-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
-              <span className="text-white/80 text-sm">Playing as:</span>
-              <button
-                onClick={changeUsername}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  clearUsername();
-                }}
-                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
-                title={isInFarcaster 
-                  ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
-                  : "Click to change username • Right-click to clear stored username"
-                }
-              >
-                @{userProfile.username}
-              </button>
-              {isInFarcaster && (
-                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded" title="Connected to Farcaster">
-                  FC
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-white/50 mt-1">
-              FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
-            </div>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div className="mb-4">
-            <div className="flex justify-between text-white text-sm mb-2">
-              <span>{progress.toFixed(1)}% Complete</span>
-              <span>{formatTime(currentTime)}s</span>
-            </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
-              <div 
-                className="bg-white rounded-full h-2 transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {showLeaderboard && (
-          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-              <Trophy size={18} />
-              Leaderboard ({sharedLeaderboard.length} scores)
-              <button
-                onClick={() => {
-                  console.log('🔄 Refreshing shared leaderboard');
-                  loadSharedLeaderboard();
-                }}
-                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
-              >
-                Refresh
-              </button>
-            </h3>
-            
-            {isLoadingLeaderboard ? (
-              <div className="text-center text-white/70 py-8">
-                <div className="animate-spin text-2xl mb-2">🏆</div>
-                <div>Loading scores...</div>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {sharedLeaderboard.length > 0 ? (
-                  sharedLeaderboard.map((entry, index) => (
-                    <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-center font-bold">
-                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                        </span>
-                        <span className="text-lg">🧩</span>
-                        <button 
-                          className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
-                          onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                          title={`View @${entry.username}'s profile`}
-                        >
-                          @{entry.username}
-                        </button>
-                      </div>
-                      <span className="font-mono font-bold">{entry.time}s</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center text-white/70 py-8">
-                    <div className="text-4xl mb-2">🏆</div>
-                    <div className="font-bold">No scores yet!</div>
-                    <div className="text-sm">Play a game to set the first record!</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {gameState === 'menu' && (
-          <div className="text-center text-white">
-            <div className="mb-8">
-              <div className="text-6xl mb-4">🧩</div>
-              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
-              <p className="text-white/80 mb-6">
-                Solve an image puzzle as fast as you can!
-              </p>
-            </div>
-            <button
-              onClick={startGame}
-              className="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-white/90 transition-colors flex items-center gap-2 mx-auto"
-            >
-              <Play size={24} />
-              Start Game
-            </button>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div>
-            <div className="mb-4 text-center">
-              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
-              {board.map((row, rowIndex) =>
-                row.map((tile, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`aspect-square rounded-md overflow-hidden transition-all duration-200 ${
-                      tile 
-                        ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/20' 
-                        : 'bg-black/30 border-2 border-dashed border-white/50'
-                    }`}
-                    style={tile ? getTileStyle(tile) : {}}
-                    onClick={() => makeMove(rowIndex, colIndex)}
-                  >
-                    {tile && !imageErrors.has(tile.image) && (
-                      <div className="w-full h-full relative">
-                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
-                          {tile.value}
-                        </span>
-                        <img 
-                          src={tile.image} 
-                          alt={`Puzzle piece ${tile.value}`}
-                          className="hidden"
-                          onError={() => handleImageError(tile.image)}
-                          onLoad={(e) => e.target.style.display = 'none'}
-                        />
-                      </div>
-                    )}
-                    {tile && imageErrors.has(tile.image) && (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
-                        <span className="text-white font-bold text-lg">{tile.value}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {gameState === 'completed' && (
-          <div className="text-center text-white">
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
-            <p className="text-lg mb-6">
-              You solved the puzzle in <span className="font-bold">{formatTime(totalTime)}s</span>
-            </p>
-            
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={shareResult}
-                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
-              >
-                <Share2 size={20} />
-                {isInFarcaster ? 'Share Cast' : 'Share Result'}
-              </button>
-              
-              <button
-                onClick={() => setGameState('menu')}
-                className="bg-white/20 text-white px-6 py-3 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors flex items-center gap-2 justify-center"
-              >
-                <Play size={20} />
-                Play Again
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default InflyncedPuzzle;
+          key={particle.i
