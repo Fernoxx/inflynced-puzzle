@@ -15,8 +15,7 @@
     "splashBackgroundColor": "#B8460E",
     "requiredCapabilities": [
       "actions.ready",
-      "actions.composeCast",
-      "context.user"
+      "actions.composeCast"
     ],
     "description": "Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard.",
     "category": "games"
