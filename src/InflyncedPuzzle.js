@@ -597,4 +597,241 @@ const InflyncedPuzzle = () => {
     >
       {particles.map(particle => (
         <div
-          key={particle.i
+          key={particle.id}
+          className="absolute rounded-full bg-white pointer-events-none"
+          style={{
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            opacity: particle.opacity,
+          }}
+        />
+      ))}
+
+      <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo.png" 
+              alt="InflyncedPuzzle Logo" 
+              className="w-8 h-8 rounded-lg"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowLeaderboard(!showLeaderboard)}
+              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
+            >
+              <Trophy size={20} />
+            </button>
+            <button
+              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
+              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
+              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
+            >
+              <Palette size={20} />
+            </button>
+          </div>
+        </div>
+
+        {userProfile && (
+          <div className="mb-4 text-center">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+              <span className="text-white/80 text-sm">Playing as:</span>
+              <button
+                onClick={changeUsername}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  clearUsername();
+                }}
+                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
+                title={isInFarcaster 
+                  ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
+                  : "Click to change username • Right-click to clear stored username"
+                }
+              >
+                @{userProfile.username}
+              </button>
+              {isInFarcaster && (
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded" title="Connected to Farcaster">
+                  FC
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-white/50 mt-1">
+              FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
+            </div>
+          </div>
+        )}
+
+        {gameState === 'playing' && (
+          <div className="mb-4">
+            <div className="flex justify-between text-white text-sm mb-2">
+              <span>{progress.toFixed(1)}% Complete</span>
+              <span>{formatTime(currentTime)}s</span>
+            </div>
+            <div className="w-full bg-white/20 rounded-full h-2">
+              <div 
+                className="bg-white rounded-full h-2 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {showLeaderboard && (
+          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
+            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+              <Trophy size={18} />
+              Leaderboard ({sharedLeaderboard.length} scores)
+              <button
+                onClick={() => {
+                  console.log('🔄 Refreshing shared leaderboard');
+                  loadSharedLeaderboard();
+                }}
+                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
+              >
+                Refresh
+              </button>
+            </h3>
+            
+            {isLoadingLeaderboard ? (
+              <div className="text-center text-white/70 py-8">
+                <div className="animate-spin text-2xl mb-2">🏆</div>
+                <div>Loading scores...</div>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {sharedLeaderboard.length > 0 ? (
+                  sharedLeaderboard.map((entry, index) => (
+                    <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-center font-bold">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                        </span>
+                        <span className="text-lg">🧩</span>
+                        <button 
+                          className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
+                          onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
+                          title={`View @${entry.username}'s profile`}
+                        >
+                          @{entry.username}
+                        </button>
+                      </div>
+                      <span className="font-mono font-bold">{entry.time}s</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-white/70 py-8">
+                    <div className="text-4xl mb-2">🏆</div>
+                    <div className="font-bold">No scores yet!</div>
+                    <div className="text-sm">Play a game to set the first record!</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {gameState === 'menu' && (
+          <div className="text-center text-white">
+            <div className="mb-8">
+              <div className="text-6xl mb-4">🧩</div>
+              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
+              <p className="text-white/80 mb-6">
+                Solve an image puzzle as fast as you can!
+              </p>
+            </div>
+            <button
+              onClick={startGame}
+              className="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-white/90 transition-colors flex items-center gap-2 mx-auto"
+            >
+              <Play size={24} />
+              Start Game
+            </button>
+          </div>
+        )}
+
+        {gameState === 'playing' && (
+          <div>
+            <div className="mb-4 text-center">
+              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
+              {board.map((row, rowIndex) =>
+                row.map((tile, colIndex) => (
+                  <div
+                    key={`${rowIndex}-${colIndex}`}
+                    className={`aspect-square rounded-md overflow-hidden transition-all duration-200 ${
+                      tile 
+                        ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/20' 
+                        : 'bg-black/30 border-2 border-dashed border-white/50'
+                    }`}
+                    style={tile ? getTileStyle(tile) : {}}
+                    onClick={() => makeMove(rowIndex, colIndex)}
+                  >
+                    {tile && !imageErrors.has(tile.image) && (
+                      <div className="w-full h-full relative">
+                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
+                          {tile.value}
+                        </span>
+                        <img 
+                          src={tile.image} 
+                          alt={`Puzzle piece ${tile.value}`}
+                          className="hidden"
+                          onError={() => handleImageError(tile.image)}
+                          onLoad={(e) => e.target.style.display = 'none'}
+                        />
+                      </div>
+                    )}
+                    {tile && imageErrors.has(tile.image) && (
+                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
+                        <span className="text-white font-bold text-lg">{tile.value}</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {gameState === 'completed' && (
+          <div className="text-center text-white">
+            <div className="text-6xl mb-4">🏆</div>
+            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
+            <p className="text-lg mb-6">
+              You solved the puzzle in <span className="font-bold">{formatTime(totalTime)}s</span>
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={shareResult}
+                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
+              >
+                <Share2 size={20} />
+                {isInFarcaster ? 'Share Cast' : 'Share Result'}
+              </button>
+              
+              <button
+                onClick={() => setGameState('menu')}
+                className="bg-white/20 text-white px-6 py-3 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors flex items-center gap-2 justify-center"
+              >
+                <Play size={20} />
+                Play Again
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default InflyncedPuzzle;
