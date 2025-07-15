@@ -1,6 +1,5 @@
-// Firebase-powered score submission API for Vercel Serverless Functions
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+// Fixed Firebase-powered score submission API for Vercel Serverless Functions
+// Use dynamic imports for Firebase in Node.js environment
 
 // Firebase configuration
 const firebaseConfig = {
@@ -12,16 +11,26 @@ const firebaseConfig = {
   appId: "1:299932878484:web:b5609e70e0111786381681"
 };
 
-// Initialize Firebase
+// Initialize Firebase with dynamic imports
 let app;
 let db;
-try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} catch (error) {
-  // Firebase might already be initialized
-  console.log('Firebase initialization note:', error.message);
-}
+
+const initializeFirebase = async () => {
+  if (!app) {
+    try {
+      const { initializeApp } = await import('firebase/app');
+      const { getFirestore } = await import('firebase/firestore');
+      
+      app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      console.log('✅ Firebase initialized successfully');
+    } catch (error) {
+      console.error('❌ Firebase initialization failed:', error);
+      throw error;
+    }
+  }
+  return { app, db };
+};
 
 // Helper function to fetch Farcaster profile data
 async function fetchFarcasterProfile(username, fid) {
@@ -121,6 +130,12 @@ export default async function handler(req, res) {
         fid: scoreEntry.fid, 
         time: scoreEntry.time 
       });
+
+      // Initialize Firebase
+      await initializeFirebase();
+      
+      // Import Firestore functions dynamically
+      const { collection, addDoc, query, getDocs, orderBy, limit } = await import('firebase/firestore');
 
       // Add to Firebase Firestore
       const docRef = await addDoc(collection(db, 'leaderboard'), scoreEntry);
