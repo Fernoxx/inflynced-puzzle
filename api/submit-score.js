@@ -1,5 +1,5 @@
-// Vercel serverless function for submitting scores
-let leaderboardData = [];
+// Vercel serverless function for submitting scores to shared leaderboard
+let sharedLeaderboard = [];
 
 export default function handler(req, res) {
   // Set CORS headers
@@ -25,6 +25,18 @@ export default function handler(req, res) {
         return res.status(400).json({ error: 'Invalid time' });
       }
 
+      // Filter out demo data first
+      sharedLeaderboard = sharedLeaderboard.filter(entry => 
+        entry.username !== 'puzzlemaster' && 
+        entry.username !== 'speedsolver' && 
+        entry.username !== 'braingamer' &&
+        !entry.fid?.includes('demo') &&
+        !entry.fid?.includes('sample')
+      );
+
+      // Remove any existing scores for this user (keep only best score per user)
+      sharedLeaderboard = sharedLeaderboard.filter(entry => entry.fid !== fid);
+
       // Create new entry
       const newEntry = {
         username: username.slice(0, 20), // Limit username length
@@ -34,20 +46,22 @@ export default function handler(req, res) {
         avatar: avatar || "🧩"
       };
 
-      // Add to leaderboard
-      leaderboardData.push(newEntry);
+      // Add to shared leaderboard
+      sharedLeaderboard.push(newEntry);
 
-      // Keep only top 100 scores to prevent memory issues
-      leaderboardData = leaderboardData
+      // Sort and keep only top 50 to prevent memory issues
+      sharedLeaderboard = sharedLeaderboard
         .sort((a, b) => a.time - b.time)
-        .slice(0, 100);
+        .slice(0, 50);
+
+      // Find user's position
+      const position = sharedLeaderboard.findIndex(entry => entry.fid === fid) + 1;
 
       res.status(200).json({ 
         success: true, 
         message: 'Score submitted successfully',
-        position: leaderboardData.findIndex(entry => 
-          entry.fid === fid && entry.timestamp === newEntry.timestamp
-        ) + 1
+        position: position,
+        totalScores: sharedLeaderboard.length
       });
 
     } catch (error) {
