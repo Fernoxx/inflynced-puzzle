@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Share2, Trophy, Palette } from 'lucide-react';
+import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -39,6 +39,8 @@ const InflyncedPuzzle = () => {
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState(null);
+  const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -131,101 +133,121 @@ const InflyncedPuzzle = () => {
     initializeFarcasterSDK();
   }, [getFallbackUserProfile]);
 
-  // Load shared leaderboard from API with localStorage fallback
+  // Load shared leaderboard from API with better error handling
   const loadSharedLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
+    setLeaderboardError(null);
+    
     try {
-      const response = await fetch('/api/leaderboard');
+      console.log('🔄 Loading leaderboard from API...');
+      const response = await fetch('/api/leaderboard', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Loaded leaderboard data:', data);
+        
         if (Array.isArray(data)) {
           setSharedLeaderboard(data);
-          console.log('✅ Loaded shared leaderboard from API:', data.length, 'scores');
-          setIsLoadingLeaderboard(false);
-          return;
+          console.log(`📊 Updated leaderboard with ${data.length} scores`);
+        } else {
+          console.warn('⚠️ API returned non-array data:', data);
+          setSharedLeaderboard([]);
         }
+      } else {
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.log('❌ API failed, trying localStorage fallback:', error);
-    }
-    
-    // Fallback to localStorage if API fails
-    try {
-      const stored = localStorage.getItem('inflynced-leaderboard');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filter out demo data
-          const realScores = parsed.filter(entry => 
-            entry.username !== 'puzzlemaster' && 
-            entry.username !== 'speedsolver' && 
-            entry.username !== 'braingamer' &&
-            !entry.fid?.includes('demo') &&
-            !entry.fid?.includes('sample')
-          );
-          
-          // Remove duplicates
-          const userBestScores = {};
-          realScores.forEach(entry => {
-            if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
-              userBestScores[entry.fid] = entry;
-            }
-          });
-          
-          const finalScores = Object.values(userBestScores)
-            .sort((a, b) => a.time - b.time)
-            .slice(0, 10);
-          
-          setSharedLeaderboard(finalScores);
-          console.log('📱 Loaded leaderboard from localStorage fallback:', finalScores.length, 'scores');
+      console.error('❌ Failed to load leaderboard:', error);
+      setLeaderboardError(error.message);
+      
+      // Fallback to localStorage if API fails
+      try {
+        const stored = localStorage.getItem('inflynced-leaderboard');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const realScores = parsed.filter(entry => 
+              entry.username !== 'puzzlemaster' && 
+              entry.username !== 'speedsolver' && 
+              entry.username !== 'braingamer' &&
+              !entry.fid?.includes('demo') &&
+              !entry.fid?.includes('sample')
+            );
+            
+            const userBestScores = {};
+            realScores.forEach(entry => {
+              if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
+                userBestScores[entry.fid] = entry;
+              }
+            });
+            
+            const finalScores = Object.values(userBestScores)
+              .sort((a, b) => a.time - b.time)
+              .slice(0, 10);
+            
+            setSharedLeaderboard(finalScores);
+            console.log('📱 Loaded leaderboard from localStorage fallback:', finalScores.length);
+          }
         }
+      } catch (e) {
+        console.error('❌ localStorage fallback also failed:', e);
+        setSharedLeaderboard([]);
       }
-    } catch (e) {
-      console.log('❌ localStorage fallback also failed');
-      setSharedLeaderboard([]);
     }
     
     setIsLoadingLeaderboard(false);
   }, []);
 
-  // Submit score to shared API with localStorage fallback
+  // Submit score to shared API with better error handling
   const submitScore = useCallback(async (time, username, fid) => {
-    console.log('📊 Submitting score to shared leaderboard:', { time: (time/1000).toFixed(1), username, fid });
+    console.log('📊 Submitting score to API:', { time: (time/1000).toFixed(1), username, fid });
     
-    if (!username || !fid) return;
+    if (!username || !fid) {
+      console.error('❌ Cannot submit score - missing username or fid');
+      return;
+    }
 
-    const newEntry = {
+    setIsSubmittingScore(true);
+
+    const scoreData = {
       username: username,
       fid: fid,
       time: parseFloat((time / 1000).toFixed(1)),
-      timestamp: Date.now(),
-      avatar: "🧩"
+      avatar: userProfile?.pfpUrl || "🧩"
     };
 
-    let apiSuccess = false;
-    
-    // Try API first
     try {
       const response = await fetch('/api/submit-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newEntry),
+        body: JSON.stringify(scoreData),
       });
 
       if (response.ok) {
-        console.log('✅ Score submitted to shared API');
-        apiSuccess = true;
-        // Reload leaderboard to show updated scores
-        setTimeout(() => loadSharedLeaderboard(), 500);
+        const result = await response.json();
+        console.log('✅ Score submitted successfully:', result);
+        
+        // If the API returns updated leaderboard, use it
+        if (result.leaderboard && Array.isArray(result.leaderboard)) {
+          setSharedLeaderboard(result.leaderboard);
+        } else {
+          // Otherwise, reload the leaderboard
+          setTimeout(() => loadSharedLeaderboard(), 1000);
+        }
+      } else {
+        throw new Error(`Submit failed: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      console.log('❌ API submission failed:', error);
-    }
-    
-    // If API fails, update localStorage as fallback
-    if (!apiSuccess) {
+      console.error('❌ API submission failed:', error);
+      
+      // Fallback to localStorage
       try {
         const stored = localStorage.getItem('inflynced-leaderboard');
         let currentScores = [];
@@ -233,7 +255,7 @@ const InflyncedPuzzle = () => {
           currentScores = JSON.parse(stored);
         }
         
-        // Remove demo data and existing user scores
+        // Remove existing user scores and demo data
         currentScores = currentScores.filter(entry => 
           entry.username !== 'puzzlemaster' && 
           entry.username !== 'speedsolver' && 
@@ -244,7 +266,11 @@ const InflyncedPuzzle = () => {
         );
         
         // Add new score
-        currentScores.push(newEntry);
+        currentScores.push({
+          ...scoreData,
+          timestamp: Date.now(),
+          pfpUrl: userProfile?.pfpUrl
+        });
         
         // Sort and save
         const updatedScores = currentScores
@@ -254,13 +280,14 @@ const InflyncedPuzzle = () => {
         localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedScores));
         console.log('📱 Score saved to localStorage fallback');
         
-        // Update display
         setSharedLeaderboard(updatedScores);
       } catch (error) {
-        console.log('❌ localStorage fallback also failed:', error);
+        console.error('❌ localStorage fallback also failed:', error);
       }
     }
-  }, [loadSharedLeaderboard]);
+    
+    setIsSubmittingScore(false);
+  }, [userProfile, loadSharedLeaderboard]);
 
   // Load leaderboard when component mounts
   useEffect(() => {
@@ -662,6 +689,11 @@ const InflyncedPuzzle = () => {
                   FC
                 </span>
               )}
+              {isSubmittingScore && (
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded animate-pulse">
+                  Saving...
+                </span>
+              )}
             </div>
             <div className="text-xs text-white/50 mt-1">
               FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
@@ -688,42 +720,76 @@ const InflyncedPuzzle = () => {
           <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <h3 className="text-white font-bold mb-3 flex items-center gap-2">
               <Trophy size={18} />
-              Leaderboard ({sharedLeaderboard.length} scores)
+              Live Leaderboard ({sharedLeaderboard.length} scores)
               <button
-                onClick={() => {
-                  console.log('🔄 Refreshing shared leaderboard');
-                  loadSharedLeaderboard();
-                }}
-                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
+                onClick={loadSharedLeaderboard}
+                disabled={isLoadingLeaderboard}
+                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center gap-1"
               >
+                <RefreshCw size={12} className={isLoadingLeaderboard ? 'animate-spin' : ''} />
                 Refresh
               </button>
             </h3>
             
+            {leaderboardError && (
+              <div className="mb-3 text-red-300 text-sm bg-red-500/20 p-2 rounded">
+                ⚠️ API Error: {leaderboardError}
+                <br />Using cached data.
+              </div>
+            )}
+            
             {isLoadingLeaderboard ? (
               <div className="text-center text-white/70 py-8">
                 <div className="animate-spin text-2xl mb-2">🏆</div>
-                <div>Loading scores...</div>
+                <div>Loading latest scores...</div>
               </div>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {sharedLeaderboard.length > 0 ? (
                   sharedLeaderboard.map((entry, index) => (
-                    <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-center font-bold">
+                    <div key={`${entry.fid}-${entry.timestamp || index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2 hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-5 text-center font-bold flex-shrink-0">
                           {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                         </span>
-                        <span className="text-lg">🧩</span>
+                        
+                        {/* Profile Picture or Avatar */}
+                        <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/20 flex items-center justify-center">
+                          {entry.pfpUrl ? (
+                            <img 
+                              src={entry.pfpUrl} 
+                              alt={`${entry.username}'s avatar`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <span className={`text-xs ${entry.pfpUrl ? 'hidden' : 'block'}`}>
+                            {entry.avatar || "🧩"}
+                          </span>
+                        </div>
+                        
+                        {/* Username */}
                         <button 
-                          className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
+                          className="hover:text-white transition-colors hover:underline truncate min-w-0 text-left"
                           onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                          title={`View @${entry.username}'s profile`}
+                          title={`View @${entry.username}'s Farcaster profile${entry.displayName ? ` (${entry.displayName})` : ''}`}
                         >
                           @{entry.username}
                         </button>
+                        
+                        {/* Display name if different from username */}
+                        {entry.displayName && entry.displayName !== entry.username && (
+                          <span className="text-white/60 text-xs truncate">
+                            ({entry.displayName})
+                          </span>
+                        )}
                       </div>
-                      <span className="font-mono font-bold">{entry.time}s</span>
+                      
+                      {/* Time */}
+                      <span className="font-mono font-bold flex-shrink-0 ml-2">{entry.time}s</span>
                     </div>
                   ))
                 ) : (
