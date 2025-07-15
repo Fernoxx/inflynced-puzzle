@@ -1,6 +1,6 @@
-// Firebase-powered leaderboard API for Vercel
+// Firebase-powered leaderboard API for Vercel Serverless Functions
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -12,22 +12,24 @@ const firebaseConfig = {
   appId: "1:299932878484:web:b5609e70e0111786381681"
 };
 
-// Initialize Firebase (only if not already initialized)
+// Initialize Firebase
 let app;
 let db;
 try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
 } catch (error) {
-  console.log('Firebase already initialized');
+  // Firebase might already be initialized
+  console.log('Firebase initialization note:', error.message);
 }
 
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Set CORS headers for cross-origin requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -35,59 +37,79 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      console.log('🔄 Fetching leaderboard from Firebase...');
+      console.log('🔄 Fetching leaderboard from Firebase Firestore...');
       
-      // Get all scores from Firebase, ordered by time (ascending = best first)
-      const scoresRef = collection(db, 'leaderboard');
+      // Query Firestore for leaderboard scores
+      const leaderboardRef = collection(db, 'leaderboard');
       const q = query(
-        scoresRef, 
-        orderBy('time', 'asc'),
-        limit(50) // Get top 50 scores
+        leaderboardRef, 
+        orderBy('time', 'asc'), // Best times first (ascending)
+        limit(100) // Get top 100 scores for processing
       );
       
       const querySnapshot = await getDocs(q);
       const allScores = [];
       
+      // Process each document
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Filter out demo/test data
-        if (data.username !== 'puzzlemaster' && 
+        
+        // Filter out demo/test data and validate entries
+        if (data.username && 
+            data.fid && 
+            typeof data.time === 'number' && 
+            data.time > 0 &&
+            data.username !== 'puzzlemaster' && 
             data.username !== 'speedsolver' && 
             data.username !== 'braingamer' &&
-            !data.fid?.includes('demo') &&
-            !data.fid?.includes('sample') &&
-            data.fid && 
-            data.username &&
-            typeof data.time === 'number') {
+            !data.fid.toString().includes('demo') &&
+            !data.fid.toString().includes('sample') &&
+            !data.fid.toString().includes('test')) {
+          
           allScores.push({
             id: doc.id,
-            ...data
+            username: data.username,
+            displayName: data.displayName || data.username,
+            fid: data.fid,
+            time: data.time,
+            timestamp: data.timestamp || Date.now(),
+            avatar: data.avatar || "🧩",
+            pfpUrl: data.pfpUrl || null
           });
         }
       });
 
-      // Remove duplicates - keep only best score per user
+      // Remove duplicates - keep only best score per user (lowest time)
       const userBestScores = {};
       allScores.forEach(entry => {
-        if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
-          userBestScores[entry.fid] = entry;
+        const fid = entry.fid.toString();
+        if (!userBestScores[fid] || entry.time < userBestScores[fid].time) {
+          userBestScores[fid] = entry;
         }
       });
 
-      // Convert back to array, sort, and limit to top 10
+      // Convert back to array, sort by time, and limit to top 10
       const finalScores = Object.values(userBestScores)
         .sort((a, b) => a.time - b.time)
         .slice(0, 10);
 
-      console.log(`✅ Returning ${finalScores.length} leaderboard entries from Firebase`);
+      console.log(`✅ Successfully fetched ${finalScores.length} leaderboard entries from Firebase`);
       
+      // Return the leaderboard
       res.status(200).json(finalScores);
       
     } catch (error) {
       console.error('❌ Firebase leaderboard fetch error:', error);
-      res.status(500).json({ error: 'Failed to fetch leaderboard', scores: [] });
+      
+      // Return error with empty scores array
+      res.status(500).json({ 
+        error: 'Failed to fetch leaderboard from Firebase', 
+        scores: [],
+        details: error.message 
+      });
     }
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    // Method not allowed
+    res.status(405).json({ error: 'Method not allowed. Use GET.' });
   }
 }
