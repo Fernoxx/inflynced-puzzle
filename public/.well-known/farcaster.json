@@ -1,23 +1,23 @@
 {
-  "accountAssociation": {
-    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
-    "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
-    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
-  },
   "miniapp": {
-    "version": "1",
     "name": "InflyncedPuzzle",
+    "version": "1",
     "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
-    "homeUrl": "https://inflyncedpuzzle.vercel.app/",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/images/frame-preview.png",
+    "homeUrl": "https://inflyncedpuzzle.vercel.app",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/frame-preview.png",
     "buttonTitle": "🧩 Play Now",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/logo.png",
-    "splashBackgroundColor": "#B8460E",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png",
+    "splashBackgroundColor": "#FFAB91",
     "requiredCapabilities": [
       "actions.ready",
       "actions.composeCast"
     ],
-    "description": "Solve image puzzles as fast as you can! Challenge your friends and climb the leaderboard.",
-    "category": "games"
+    "category": "games",
+    "description": "Built for orange frens, made to flex your speed."
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
+    "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
+    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
   }
 }
