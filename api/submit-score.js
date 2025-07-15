@@ -1,35 +1,30 @@
-// Fixed Vercel serverless function for submitting scores
-// Uses file-based persistence for simple deployment
+// Firebase-powered score submission API for Vercel
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 
-import { promises as fs } from 'fs';
-import path from 'path';
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCDKBbxqu4uU6_wq1KPvv5yRuH6KaUqWWs",
+  authDomain: "inflynced-puzzle.firebaseapp.com",
+  projectId: "inflynced-puzzle",
+  storageBucket: "inflynced-puzzle.firebasestorage.app",
+  messagingSenderId: "299932878484",
+  appId: "1:299932878484:web:b5609e70e0111786381681"
+};
 
-const LEADERBOARD_FILE = '/tmp/leaderboard.json';
-
-// Helper function to load leaderboard from file
-async function loadLeaderboard() {
-  try {
-    const data = await fs.readFile(LEADERBOARD_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    // File doesn't exist or is empty, return empty array
-    return [];
-  }
-}
-
-// Helper function to save leaderboard to file
-async function saveLeaderboard(leaderboard) {
-  try {
-    await fs.writeFile(LEADERBOARD_FILE, JSON.stringify(leaderboard, null, 2));
-  } catch (error) {
-    console.error('Error saving leaderboard:', error);
-  }
+// Initialize Firebase (only if not already initialized)
+let app;
+let db;
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+} catch (error) {
+  console.log('Firebase already initialized');
 }
 
 // Helper function to fetch Farcaster profile data
 async function fetchFarcasterProfile(username, fid) {
   try {
-    // Try to get profile from Warpcast API (if available)
     const response = await fetch(`https://api.warpcast.com/v2/user?fid=${fid}`);
     if (response.ok) {
       const data = await response.json();
@@ -43,7 +38,6 @@ async function fetchFarcasterProfile(username, fid) {
     console.log('Could not fetch Farcaster profile:', error);
   }
   
-  // Fallback to provided data
   return {
     username: username,
     displayName: username,
@@ -75,18 +69,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid time' });
       }
 
-      // Load current leaderboard
-      let leaderboard = await loadLeaderboard();
-
-      // Filter out demo data and old scores from same user
-      leaderboard = leaderboard.filter(entry => 
-        entry.username !== 'puzzlemaster' && 
-        entry.username !== 'speedsolver' && 
-        entry.username !== 'braingamer' &&
-        !entry.fid?.includes('demo') &&
-        !entry.fid?.includes('sample') &&
-        entry.fid !== fid
-      );
+      console.log('📊 Submitting score to Firebase:', { username, fid, time });
 
       // Fetch updated Farcaster profile
       const profile = await fetchFarcasterProfile(username, fid);
@@ -98,38 +81,65 @@ export default async function handler(req, res) {
         fid: fid,
         time: parseFloat(time.toFixed(1)),
         timestamp: Date.now(),
-        avatar: profile.pfpUrl || "🧩",
+        avatar: profile.pfpUrl || avatar || "🧩",
         pfpUrl: profile.pfpUrl
       };
 
-      console.log('Adding new score entry:', newEntry);
+      // Add to Firebase
+      const docRef = await addDoc(collection(db, 'leaderboard'), newEntry);
+      console.log('✅ Score added to Firebase with ID:', docRef.id);
 
-      // Add to leaderboard
-      leaderboard.push(newEntry);
+      // Get updated leaderboard for user position
+      const scoresRef = collection(db, 'leaderboard');
+      const q = query(
+        scoresRef,
+        orderBy('time', 'asc'),
+        limit(50)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const allScores = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.username !== 'puzzlemaster' && 
+            data.username !== 'speedsolver' && 
+            data.username !== 'braingamer' &&
+            !data.fid?.includes('demo') &&
+            !data.fid?.includes('sample') &&
+            data.fid && 
+            data.username &&
+            typeof data.time === 'number') {
+          allScores.push({ id: doc.id, ...data });
+        }
+      });
 
-      // Sort by time and keep top 50
-      leaderboard = leaderboard
-        .sort((a, b) => a.time - b.time)
-        .slice(0, 50);
+      // Remove duplicates - keep only best score per user
+      const userBestScores = {};
+      allScores.forEach(entry => {
+        if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
+          userBestScores[entry.fid] = entry;
+        }
+      });
 
-      // Save updated leaderboard
-      await saveLeaderboard(leaderboard);
+      const finalScores = Object.values(userBestScores)
+        .sort((a, b) => a.time - b.time);
 
       // Find user's position
-      const position = leaderboard.findIndex(entry => entry.fid === fid) + 1;
+      const position = finalScores.findIndex(entry => entry.fid === fid) + 1;
 
-      console.log(`Score submitted successfully. User ${username} is now position ${position}`);
+      console.log(`✅ Score submitted successfully. User ${username} is now position ${position}`);
 
       res.status(200).json({ 
         success: true, 
         message: 'Score submitted successfully',
         position: position,
-        totalScores: leaderboard.length,
-        leaderboard: leaderboard.slice(0, 10) // Return top 10 for immediate update
+        totalScores: finalScores.length,
+        leaderboard: finalScores.slice(0, 10) // Return top 10 for immediate update
       });
 
     } catch (error) {
-      console.error('Submit score error:', error);
+      console.error('❌ Firebase submit score error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   } else {
