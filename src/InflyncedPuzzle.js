@@ -136,25 +136,50 @@ const InflyncedPuzzle = () => {
     initializeFarcasterSDK();
   }, [getFallbackUserProfile]);
 
-  // Get real leaderboard scores, remove duplicates, keep best score per user
+  // Clear demo data and get real leaderboard scores only
   const getRealLeaderboard = useCallback(() => {
     try {
       const stored = localStorage.getItem('inflynced-leaderboard');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filter out demo users and keep only real users
+          const realScores = parsed.filter(entry => 
+            entry.username !== 'puzzlemaster' && 
+            entry.username !== 'speedsolver' && 
+            entry.username !== 'braingamer' &&
+            entry.fid !== 'demo1' &&
+            entry.fid !== 'demo2' &&
+            entry.fid !== 'demo3' &&
+            entry.fid !== 'sample1' &&
+            entry.fid !== 'sample2' &&
+            entry.fid !== 'sample3'
+          );
+          
           // Remove duplicates - keep only best score per user
           const userBestScores = {};
-          parsed.forEach(entry => {
+          realScores.forEach(entry => {
             if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
               userBestScores[entry.fid] = entry;
             }
           });
           
           // Convert back to array and sort
-          return Object.values(userBestScores)
+          const finalScores = Object.values(userBestScores)
             .sort((a, b) => a.time - b.time)
             .slice(0, 10);
+          
+          // Save cleaned data back to localStorage
+          localStorage.setItem('inflynced-leaderboard', JSON.stringify(finalScores));
+          
+          return finalScores;
+        }
+      }
+    } catch (e) {
+      console.log('Error reading scores');
+    }
+    return [];
+  }, []);0, 10);
         }
       }
     } catch (e) {
@@ -622,37 +647,53 @@ const InflyncedPuzzle = () => {
           <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <h3 className="text-white font-bold mb-3 flex items-center gap-2">
               <Trophy size={18} />
-              Leaderboard ({getRealLeaderboard().length} scores)
+              Leaderboard ({sharedLeaderboard.length} scores)
+              <button
+                onClick={() => {
+                  console.log('🔄 Refreshing shared leaderboard');
+                  loadSharedLeaderboard();
+                }}
+                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
+              >
+                Refresh
+              </button>
             </h3>
             
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {getRealLeaderboard().length > 0 ? (
-                getRealLeaderboard().map((entry, index) => (
-                  <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 text-center font-bold">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                      </span>
-                      <span className="text-lg">🧩</span>
-                      <button 
-                        className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
-                        onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                        title={`View @${entry.username}'s profile`}
-                      >
-                        @{entry.username}
-                      </button>
+            {isLoadingLeaderboard ? (
+              <div className="text-center text-white/70 py-8">
+                <div className="animate-spin text-2xl mb-2">🏆</div>
+                <div>Loading scores...</div>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {sharedLeaderboard.length > 0 ? (
+                  sharedLeaderboard.map((entry, index) => (
+                    <div key={`${entry.fid}-${index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 text-center font-bold">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                        </span>
+                        <span className="text-lg">🧩</span>
+                        <button 
+                          className="hover:text-white transition-colors hover:underline max-w-[100px] truncate"
+                          onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
+                          title={`View @${entry.username}'s profile`}
+                        >
+                          @{entry.username}
+                        </button>
+                      </div>
+                      <span className="font-mono font-bold">{entry.time}s</span>
                     </div>
-                    <span className="font-mono font-bold">{entry.time}s</span>
+                  ))
+                ) : (
+                  <div className="text-center text-white/70 py-8">
+                    <div className="text-4xl mb-2">🏆</div>
+                    <div className="font-bold">No scores yet!</div>
+                    <div className="text-sm">Play a game to set the first record!</div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center text-white/70 py-8">
-                  <div className="text-4xl mb-2">🏆</div>
-                  <div className="font-bold">No scores yet!</div>
-                  <div className="text-sm">Play a game to set the first record!</div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
