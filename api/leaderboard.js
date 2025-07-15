@@ -1,6 +1,5 @@
-// Firebase-powered leaderboard API for Vercel Serverless Functions
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+// Fixed Firebase-powered leaderboard API for Vercel Serverless Functions
+// Use dynamic imports for Firebase in Node.js environment
 
 // Firebase configuration
 const firebaseConfig = {
@@ -12,16 +11,26 @@ const firebaseConfig = {
   appId: "1:299932878484:web:b5609e70e0111786381681"
 };
 
-// Initialize Firebase
+// Initialize Firebase with dynamic imports
 let app;
 let db;
-try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} catch (error) {
-  // Firebase might already be initialized
-  console.log('Firebase initialization note:', error.message);
-}
+
+const initializeFirebase = async () => {
+  if (!app) {
+    try {
+      const { initializeApp } = await import('firebase/app');
+      const { getFirestore } = await import('firebase/firestore');
+      
+      app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      console.log('✅ Firebase initialized successfully');
+    } catch (error) {
+      console.error('❌ Firebase initialization failed:', error);
+      throw error;
+    }
+  }
+  return { app, db };
+};
 
 export default async function handler(req, res) {
   // Set CORS headers for cross-origin requests
@@ -38,6 +47,12 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       console.log('🔄 Fetching leaderboard from Firebase Firestore...');
+      
+      // Initialize Firebase
+      await initializeFirebase();
+      
+      // Import Firestore functions dynamically
+      const { collection, getDocs, query, orderBy, limit } = await import('firebase/firestore');
       
       // Query Firestore for leaderboard scores
       const leaderboardRef = collection(db, 'leaderboard');
