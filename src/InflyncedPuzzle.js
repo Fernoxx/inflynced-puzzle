@@ -36,8 +36,6 @@ const InflyncedPuzzle = () => {
   const [imageErrors, setImageErrors] = useState(new Set());
   const [sdkInstance, setSdkInstance] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
-  const [isInCoinbase, setIsInCoinbase] = useState(false);
-  const [walletType, setWalletType] = useState('none');
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -83,130 +81,63 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-  // Detect wallet type and environment
-  const detectWalletEnvironment = useCallback(() => {
-    console.log('🔍 Detecting wallet environment...');
-    
-    // Check if we're in Coinbase wallet
-    const isCoinbaseWallet = window.ethereum?.isCoinbaseWallet || 
-                           window.coinbaseWalletExtension ||
-                           window.ethereum?.providers?.find(p => p.isCoinbaseWallet);
-    
-    // Check if we're in Farcaster frame
-    const isFarcasterFrame = window.parent !== window || 
-                           window.location !== window.parent.location ||
-                           navigator.userAgent.includes('farcaster');
-    
-    if (isCoinbaseWallet) {
-      console.log('💰 Coinbase wallet detected');
-      setIsInCoinbase(true);
-      setWalletType('coinbase');
-      return 'coinbase';
-    } else if (isFarcasterFrame) {
-      console.log('🎭 Farcaster frame detected');
-      setIsInFarcaster(true);
-      setWalletType('farcaster');
-      return 'farcaster';
-    } else {
-      console.log('🌐 Standard browser environment');
-      setWalletType('browser');
-      return 'browser';
-    }
-  }, []);
-
-    // Initialize wallet environment and SDK
+      // Initialize SDK - works universally in Farcaster and Coinbase wallet
   useEffect(() => {
-    const initializeWalletEnvironment = async () => {
+    const initializeMiniapp = async () => {
       try {
-        console.log('🔄 Initializing wallet environment...');
+        console.log('🔄 Initializing miniapp...');
         
-        // First detect the wallet environment
-        const walletEnvironment = detectWalletEnvironment();
+        // Try to initialize Farcaster SDK - it will work in both environments
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        setSdkInstance(sdk);
         
-        // Initialize appropriate SDK based on environment
-        if (walletEnvironment === 'farcaster' || walletEnvironment === 'browser') {
-          try {
-            // Import the Farcaster SDK
-            const { sdk } = await import('@farcaster/miniapp-sdk');
-            setSdkInstance(sdk);
-            
-            // CRITICAL: Always call ready() first - this dismisses the splash screen
-            await sdk.actions.ready();
-            console.log('✅ Farcaster SDK ready() called successfully');
-            
-            // Only get context if we're actually in Farcaster
-            if (walletEnvironment === 'farcaster') {
-              console.log('🔍 Getting SDK context...');
-              const context = await sdk.context;
-              console.log('📋 Full SDK context:', context);
-              
-              // Extract real user data from context
-              if (context?.user) {
-                console.log('👤 Raw user data from context:', context.user);
-                
-                const farcasterUser = {
-                  username: context.user.username || `user${context.user.fid}`,
-                  fid: context.user.fid,
-                  displayName: context.user.displayName || context.user.username,
-                  pfpUrl: context.user.pfpUrl || context.user.pfp
-                };
-                
-                console.log('✅ Processed Farcaster user:', farcasterUser);
-                setUserProfile(farcasterUser);
-              } else {
-                console.log('❌ No user in context, using fallback');
-                getFallbackUserProfile();
-              }
-            } else {
-              // Browser environment, use fallback
-              getFallbackUserProfile();
-            }
-            
-          } catch (error) {
-            console.log('❌ Farcaster SDK not available:', error);
-            getFallbackUserProfile();
-          }
-        } else if (walletEnvironment === 'coinbase') {
-          // Coinbase wallet environment
-          console.log('💰 Initializing for Coinbase wallet...');
+        // CRITICAL: Always call ready() first - this dismisses the splash screen
+        await sdk.actions.ready();
+        console.log('✅ SDK ready() called successfully');
+        
+        // Try to get context - this will work in Farcaster and gracefully fail in Coinbase
+        try {
+          console.log('🔍 Getting SDK context...');
+          const context = await sdk.context;
+          console.log('📋 Full SDK context:', context);
           
-          // Try to get user info from Coinbase wallet if available
-          if (window.ethereum?.isCoinbaseWallet) {
-            try {
-              const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-              if (accounts.length > 0) {
-                const coinbaseUser = {
-                  username: `coinbase_${accounts[0].slice(2, 8)}`,
-                  fid: accounts[0],
-                  displayName: `Coinbase User`,
-                  pfpUrl: null,
-                  walletAddress: accounts[0]
-                };
-                setUserProfile(coinbaseUser);
-                console.log('✅ Coinbase user profile created:', coinbaseUser);
-              } else {
-                getFallbackUserProfile();
-              }
-            } catch (error) {
-              console.log('❌ Failed to get Coinbase account:', error);
-              getFallbackUserProfile();
-            }
+          // Extract real user data from context if available
+          if (context?.user) {
+            console.log('👤 Raw user data from context:', context.user);
+            
+            const farcasterUser = {
+              username: context.user.username || `user${context.user.fid}`,
+              fid: context.user.fid,
+              displayName: context.user.displayName || context.user.username,
+              pfpUrl: context.user.pfpUrl || context.user.pfp
+            };
+            
+            console.log('✅ Processed Farcaster user:', farcasterUser);
+            setUserProfile(farcasterUser);
+            setIsInFarcaster(true);
           } else {
+            console.log('❌ No user in context, using fallback');
+            setIsInFarcaster(false);
             getFallbackUserProfile();
           }
+        } catch (contextError) {
+          console.log('ℹ️ Context not available (likely in Coinbase wallet), using fallback');
+          setIsInFarcaster(false);
+          getFallbackUserProfile();
         }
         
         setInitializationComplete(true);
         
       } catch (error) {
-        console.log('❌ Wallet environment initialization failed:', error);
+        console.log('ℹ️ SDK not available (likely in Coinbase wallet), using fallback');
+        setIsInFarcaster(false);
         setInitializationComplete(true);
         getFallbackUserProfile();
       }
     };
     
-    initializeWalletEnvironment();
-  }, [getFallbackUserProfile, detectWalletEnvironment]);
+    initializeMiniapp();
+  }, [getFallbackUserProfile]);
 
   // Load shared leaderboard from API with better error handling
   const loadSharedLeaderboard = useCallback(async () => {
@@ -957,8 +888,8 @@ const InflyncedPuzzle = () => {
                 onClick={shareResult}
                 className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
               >
-                <Share2 size={20} />
-                {isInFarcaster ? 'Share Cast' : 'Share Result'}
+                                  <Share2 size={20} />
+                  Share Result
               </button>
               
               <button
