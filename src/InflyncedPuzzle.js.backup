@@ -528,6 +528,7 @@ const InflyncedPuzzle = () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
+    // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
         const result = await sdkInstance.actions.composeCast({
@@ -548,6 +549,7 @@ const InflyncedPuzzle = () => {
       }
     }
     
+    // Fallback to Web Share API or clipboard
     const miniappUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
     if (navigator.share) {
       try {
@@ -560,10 +562,12 @@ const InflyncedPuzzle = () => {
         console.log('Web Share cancelled or failed:', error);
       }
     } else {
+      // Clipboard fallback
       try {
         await navigator.clipboard.writeText(`${text}\n\n${miniappUrl}`);
         window.alert('Result copied to clipboard!');
       } catch (error) {
+        // Manual copy fallback
         const textArea = document.createElement('textarea');
         textArea.value = `${text}\n\n${miniappUrl}`;
         document.body.appendChild(textArea);
