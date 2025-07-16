@@ -1,27 +1,17 @@
 {
-  "frame": {
-    "name": "InflyncedPuzzle",
-    "version": "1",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
-    "homeUrl": "https://inflyncedpuzzle.vercel.app",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png",
-    "buttonTitle": "Orangify your brain",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png",
-    "splashBackgroundColor": "#C84A1B",
-    "webhookUrl": "https://inflyncedpuzzle.vercel.app/api/webhook",
-    "tags": [
-      "inflyncedpuzzle",
-      "inflynced",
-      "inflynce",
-      "puzzle"
-    ],
-    "primaryCategory": "games",
-    "subtitle": "A puzzle game for the orangified frens on Farcaster",
-    "description": "InflyncedPuzzle is a fast-paced tile game made just for the orange gang. Slide the tiles, complete the image, and challenge your frens to beat your time, all right inside Farcaster."
-  },
   "accountAssociation": {
     "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
     "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
     "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "InflyncedPuzzle",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
+    "homeUrl": "https://inflyncedpuzzle.vercel.app",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg",
+    "buttonTitle": "🧩 Start Puzzle",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
+    "splashBackgroundColor": "#B8460E"
   }
 }
