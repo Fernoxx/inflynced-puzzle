@@ -3,61 +3,33 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#C84A1B" />
-    <meta name="description" content="InflyncedPuzzle is a fast-paced tile game made just for the orange gang. Slide the tiles, complete the image, and challenge your frens to beat your time, all right inside Farcaster." />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#B8460E" />
+    <meta name="description" content="InflyncedPuzzle - Fast-paced sliding puzzle challenge on Farcaster" />
     
-    <!-- Mobile and Wallet App Compatibility -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="InflyncedPuzzle" />
+    <!-- Farcaster Miniapp Meta Tags -->
+    <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg","button":{"title":"🧩 Start Puzzle","action":{"type":"launch_frame","name":"InflyncedPuzzle","url":"https://inflyncedpuzzle.vercel.app","splashImageUrl":"https://inflyncedpuzzle.vercel.app/icon.png","splashBackgroundColor":"#B8460E"}}}' />
     
-    <!-- Coinbase Wallet and Multi-Wallet Support -->
-    <meta name="wallet-compatible" content="true" />
-    <meta name="dapp-compatible" content="true" />
-    <meta name="supports-dark-mode" content="false" />
+    <!-- For backward compatibility -->
+    <meta name="fc:frame" content='{"version":"1","imageUrl":"https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg","button":{"title":"🧩 Start Puzzle","action":{"type":"launch_frame","name":"InflyncedPuzzle","url":"https://inflyncedpuzzle.vercel.app","splashImageUrl":"https://inflyncedpuzzle.vercel.app/icon.png","splashBackgroundColor":"#B8460E"}}}' />
     
-    <!-- Farcaster Frame Meta Tags -->
-    <meta name="fc:frame" content='{
-      "version": "1",
-      "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png",
-      "button": {
-        "title": "Orangify your brain",
-        "action": {
-          "type": "launch_frame",
-          "name": "InflyncedPuzzle",
-          "url": "https://inflyncedpuzzle.vercel.app",
-          "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png",
-          "splashBackgroundColor": "#C84A1B"
-        }
-      }
-    }' />
-    
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="InflyncedPuzzle - Fast-paced sliding puzzle challenge" />
-    <meta property="og:description" content="InflyncedPuzzle is a fast-paced tile game made just for the orange gang. Slide the tiles, complete the image, and challenge your frens to beat your time, all right inside Farcaster." />
-    <meta property="og:image" content="https://inflyncedpuzzle.vercel.app/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="InflyncedPuzzle" />
+    <meta property="og:description" content="Fast-paced sliding puzzle challenge on Farcaster" />
+    <meta property="og:image" content="https://inflyncedpuzzle.vercel.app/og-image.png." />
     <meta property="og:url" content="https://inflyncedpuzzle.vercel.app" />
-    <meta property="og:site_name" content="InflyncedPuzzle" />
+    <meta property="og:type" content="website" />
     
-    <!-- Twitter Card Meta Tags -->
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="InflyncedPuzzle - Fast-paced sliding puzzle challenge" />
-    <meta name="twitter:description" content="InflyncedPuzzle is a fast-paced tile game made just for the orange gang. Slide the tiles, complete the image, and challenge your frens to beat your time, all right inside Farcaster." />
-    <meta name="twitter:image" content="https://inflyncedpuzzle.vercel.app/og-image.png" />
-    <meta name="twitter:url" content="https://inflyncedpuzzle.vercel.app" />
+    <meta name="twitter:title" content="InflyncedPuzzle" />
+    <meta name="twitter:description" content="Fast-paced sliding puzzle challenge on Farcaster" />
+    <meta name="twitter:image" content="https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg" />
     
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     
-    <title>InflyncedPuzzle - Fast-paced sliding puzzle challenge</title>
-    
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>InflyncedPuzzle - Farcaster Miniapp</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
