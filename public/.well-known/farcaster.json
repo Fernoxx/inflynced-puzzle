@@ -1,12 +1,12 @@
 {
   "miniapp": {
+    "version": "3",  // Changed from "2" to "3"
     "name": "InflyncedPuzzle",
-    "version": "2",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=2",
-    "homeUrl": "https://inflyncedpuzzle.vercel.app",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/frame-preview.png?v=2",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
+    "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=3",
     "buttonTitle": "🧩 Play Now",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=2",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=3",
     "splashBackgroundColor": "#FFAB91",
     "requiredCapabilities": [
       "actions.ready",
@@ -18,6 +18,6 @@
   "accountAssociation": {
     "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
     "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
-    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
+    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTg5NTAzMDkzZTZlZGYxYg=="
   }
 }
