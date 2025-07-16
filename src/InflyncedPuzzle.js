@@ -535,6 +535,14 @@ const InflyncedPuzzle = () => {
   // Use Farcaster composeCast if available, otherwise fallback
   if (sdkInstance && isInFarcaster) {
     try {
+      const shareResult = useCallback(async () => {
+  const timeInSeconds = (totalTime / 1000).toFixed(1);
+  const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
+  const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
+  
+  // Use Farcaster composeCast if available, otherwise fallback
+  if (sdkInstance && isInFarcaster) {
+    try {
       const result = await sdkInstance.actions.composeCast({
         text: text,
         embeds: [appUrl]
