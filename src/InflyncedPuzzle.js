@@ -533,7 +533,7 @@ const InflyncedPuzzle = () => {
         const result = await sdkInstance.actions.composeCast({
           text: text,
           embeds: [{
-            url: "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle"
+            url: "https://inflyncedpuzzle.vercel.app"
           }]
         });
         
@@ -548,7 +548,7 @@ const InflyncedPuzzle = () => {
       }
     }
     
-    const miniappUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
+    const miniappUrl = "https://inflyncedpuzzle.vercel.app";
     if (navigator.share) {
       try {
         await navigator.share({
