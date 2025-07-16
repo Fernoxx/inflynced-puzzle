@@ -526,15 +526,15 @@ const InflyncedPuzzle = () => {
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
+    const appUrl = window.location.origin;
     const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
+    // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
         const result = await sdkInstance.actions.composeCast({
           text: text,
-          embeds: [{
-            url: "https://inflyncedpuzzle.vercel.app"
-          }]
+          embeds: [appUrl]
         });
         
         if (result?.cast) {
@@ -548,24 +548,26 @@ const InflyncedPuzzle = () => {
       }
     }
     
-    const miniappUrl = "https://inflyncedpuzzle.vercel.app";
+    // Fallback to Web Share API or clipboard
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'InflyncedPuzzle - I solved it!',
           text: text,
-          url: miniappUrl,
+          url: appUrl,
         });
       } catch (error) {
         console.log('Web Share cancelled or failed:', error);
       }
     } else {
+      // Clipboard fallback
       try {
-        await navigator.clipboard.writeText(`${text}\n\n${miniappUrl}`);
+        await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
         window.alert('Result copied to clipboard!');
       } catch (error) {
+        // Manual copy fallback
         const textArea = document.createElement('textarea');
-        textArea.value = `${text}\n\n${miniappUrl}`;
+        textArea.value = `${text}\n\n${appUrl}`;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
