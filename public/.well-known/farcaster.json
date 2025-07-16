@@ -2,22 +2,32 @@
   "miniapp": {
     "version": "vNext",
     "name": "InflyncedPuzzle",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
     "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=3",
-    "buttonTitle": "🧩 Play Now",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=3",
-    "splashBackgroundColor": "#FFAB91",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png",
+    "buttonTitle": "Orangify your brain",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png",
+    "splashBackgroundColor": "#C84A1B",
+    "webhookUrl": "https://inflyncedpuzzle.vercel.app/api/webhook",
+    "subtitle": "A puzzle game for the orangified frens on Farcaster",
+    "description": "InflyncedPuzzle is a fast-paced tile game made just for the orange gang. Slide the tiles, complete the image, and challenge your frens to beat your time, all right inside Farcaster.",
+    "category": "games",
+    "tags": [
+      "inflynced",
+      "puzzle",
+      "orange",
+      "inflyncedpuzzle",
+      "game"
+    ],
+    "castShareUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
     "requiredCapabilities": [
       "actions.ready",
       "actions.composeCast"
-    ],
-    "category": "games",
-    "description": "Built for orange frens, made to flex your speed."
+    ]
   },
   "accountAssociation": {
-    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
+    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImF1dGgiLCJrZXkiOiIweDNjRjg3Qjc2ZDJBMUQzNkY5NTQyQjREYTJhNkI0QjNEYzBmMEJiMmUifQ",
     "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
-    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTg5NTAzMDkzZTZlZGYxYg=="
+    "signature": "2bcYHW2QI+H+IuJ+UrROBjbCGxjxiNVlecQx/lQgQjBzP08O0p8xQXGB75xdextyZ4KCPUn8BUL44idtp/4j7hw="
   }
 }
