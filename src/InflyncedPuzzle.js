@@ -526,50 +526,59 @@ const InflyncedPuzzle = () => {
     // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
-        const result = await sdkInstance.actions.composeCast({
-          text: text,
-          embeds: [appUrl]
-        });
-        
-        if (result?.cast) {
-          console.log('✅ Cast shared successfully:', result.cast.hash);
-        } else {
-          console.log('Cast sharing was cancelled');
-        }
-        return;
-      } catch (error) {
-        console.log('Failed to use Farcaster composeCast:', error);
+        const shareResult = useCallback(async () => {
+  const timeInSeconds = (totalTime / 1000).toFixed(1);
+  // Use your OFFICIAL Farcaster miniapp URL
+  const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
+  const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
+  
+  // Use Farcaster composeCast if available, otherwise fallback
+  if (sdkInstance && isInFarcaster) {
+    try {
+      const result = await sdkInstance.actions.composeCast({
+        text: text,
+        embeds: [appUrl]
+      });
+      
+      if (result?.cast) {
+        console.log('✅ Cast shared successfully:', result.cast.hash);
+      } else {
+        console.log('Cast sharing was cancelled');
       }
+      return;
+    } catch (error) {
+      console.log('Failed to use Farcaster composeCast:', error);
     }
-    
-    // Fallback to Web Share API or clipboard
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'InflyncedPuzzle - I solved it!',
-          text: text,
-          url: appUrl,
-        });
-      } catch (error) {
-        console.log('Web Share cancelled or failed:', error);
-      }
-    } else {
-      // Clipboard fallback
-      try {
-        await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
-        window.alert('Result copied to clipboard!');
-      } catch (error) {
-        // Manual copy fallback
-        const textArea = document.createElement('textarea');
-        textArea.value = `${text}\n\n${appUrl}`;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        window.alert('Result copied to clipboard!');
-      }
+  }
+  
+  // Fallback to Web Share API or clipboard
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'InflyncedPuzzle - I solved it!',
+        text: text,
+        url: appUrl,
+      });
+    } catch (error) {
+      console.log('Web Share cancelled or failed:', error);
     }
-  }, [totalTime, sdkInstance, isInFarcaster]);
+  } else {
+    // Clipboard fallback
+    try {
+      await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
+      window.alert('Result copied to clipboard!');
+    } catch (error) {
+      // Manual copy fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = `${text}\n\n${appUrl}`;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      window.alert('Result copied to clipboard!');
+    }
+  }
+}, [totalTime, sdkInstance, isInFarcaster]);
 
   const formatTime = (time) => {
     return (time / 1000).toFixed(1);
