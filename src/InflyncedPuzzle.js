@@ -526,20 +526,51 @@ const InflyncedPuzzle = () => {
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
-    // Use your OFFICIAL Farcaster miniapp URL
+    // Use your OFFICIAL Farcaster miniapp URL - NEVER use vercel.app
     const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
     const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇\n\n${appUrl}`;
+    
+    console.log('🔄 Share function called with URL:', appUrl);
     
     // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
         console.log('🔄 Attempting to share with URL:', appUrl);
-        const result = await sdkInstance.actions.composeCast({
-          text: text,
-          embeds: [{
-            url: appUrl
-          }]
-        });
+        
+        // Try multiple embed formats to ensure the URL is used
+        const embedOptions = [
+          { url: appUrl },
+          appUrl,
+          { type: 'url', url: appUrl },
+          { link: appUrl }
+        ];
+        
+        let result;
+        for (const embed of embedOptions) {
+          try {
+            console.log('🔄 Trying embed format:', embed);
+            result = await sdkInstance.actions.composeCast({
+              text: text,
+              embeds: [embed]
+            });
+            
+            if (result?.cast) {
+              console.log('✅ Successfully shared with embed format:', embed);
+              break;
+            }
+          } catch (embedError) {
+            console.log('❌ Failed with embed format:', embed, embedError);
+            continue;
+          }
+        }
+        
+        // If all embed formats fail, try without embeds (URL is in text)
+        if (!result?.cast) {
+          console.log('🔄 Trying without embeds, URL in text only');
+          result = await sdkInstance.actions.composeCast({
+            text: text
+          });
+        }
         
         if (result?.cast) {
           console.log('✅ Cast shared successfully:', result.cast.hash);
