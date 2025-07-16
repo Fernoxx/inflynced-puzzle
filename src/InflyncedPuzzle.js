@@ -36,6 +36,8 @@ const InflyncedPuzzle = () => {
   const [imageErrors, setImageErrors] = useState(new Set());
   const [sdkInstance, setSdkInstance] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
+  const [isInCoinbase, setIsInCoinbase] = useState(false);
+  const [walletType, setWalletType] = useState('none');
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -81,57 +83,130 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-  // Initialize Farcaster SDK with proper context reading
+  // Detect wallet type and environment
+  const detectWalletEnvironment = useCallback(() => {
+    console.log('🔍 Detecting wallet environment...');
+    
+    // Check if we're in Coinbase wallet
+    const isCoinbaseWallet = window.ethereum?.isCoinbaseWallet || 
+                           window.coinbaseWalletExtension ||
+                           window.ethereum?.providers?.find(p => p.isCoinbaseWallet);
+    
+    // Check if we're in Farcaster frame
+    const isFarcasterFrame = window.parent !== window || 
+                           window.location !== window.parent.location ||
+                           navigator.userAgent.includes('farcaster');
+    
+    if (isCoinbaseWallet) {
+      console.log('💰 Coinbase wallet detected');
+      setIsInCoinbase(true);
+      setWalletType('coinbase');
+      return 'coinbase';
+    } else if (isFarcasterFrame) {
+      console.log('🎭 Farcaster frame detected');
+      setIsInFarcaster(true);
+      setWalletType('farcaster');
+      return 'farcaster';
+    } else {
+      console.log('🌐 Standard browser environment');
+      setWalletType('browser');
+      return 'browser';
+    }
+  }, []);
+
+    // Initialize wallet environment and SDK
   useEffect(() => {
-    const initializeFarcasterSDK = async () => {
+    const initializeWalletEnvironment = async () => {
       try {
-        console.log('🔄 Initializing Farcaster SDK...');
+        console.log('🔄 Initializing wallet environment...');
         
-        // Import the SDK
-        const { sdk } = await import('@farcaster/miniapp-sdk');
-        setSdkInstance(sdk);
+        // First detect the wallet environment
+        const walletEnvironment = detectWalletEnvironment();
         
-        // CRITICAL: Always call ready() first - this dismisses the splash screen
-        await sdk.actions.ready();
-        console.log('✅ Farcaster SDK ready() called successfully');
-        
-        // Now get the context - THE KEY FIX: await sdk.context
-        console.log('🔍 Getting SDK context...');
-        const context = await sdk.context;
-        console.log('📋 Full SDK context:', context);
-        
-        // Extract real user data from context
-        if (context?.user) {
-          console.log('👤 Raw user data from context:', context.user);
+        // Initialize appropriate SDK based on environment
+        if (walletEnvironment === 'farcaster' || walletEnvironment === 'browser') {
+          try {
+            // Import the Farcaster SDK
+            const { sdk } = await import('@farcaster/miniapp-sdk');
+            setSdkInstance(sdk);
+            
+            // CRITICAL: Always call ready() first - this dismisses the splash screen
+            await sdk.actions.ready();
+            console.log('✅ Farcaster SDK ready() called successfully');
+            
+            // Only get context if we're actually in Farcaster
+            if (walletEnvironment === 'farcaster') {
+              console.log('🔍 Getting SDK context...');
+              const context = await sdk.context;
+              console.log('📋 Full SDK context:', context);
+              
+              // Extract real user data from context
+              if (context?.user) {
+                console.log('👤 Raw user data from context:', context.user);
+                
+                const farcasterUser = {
+                  username: context.user.username || `user${context.user.fid}`,
+                  fid: context.user.fid,
+                  displayName: context.user.displayName || context.user.username,
+                  pfpUrl: context.user.pfpUrl || context.user.pfp
+                };
+                
+                console.log('✅ Processed Farcaster user:', farcasterUser);
+                setUserProfile(farcasterUser);
+              } else {
+                console.log('❌ No user in context, using fallback');
+                getFallbackUserProfile();
+              }
+            } else {
+              // Browser environment, use fallback
+              getFallbackUserProfile();
+            }
+            
+          } catch (error) {
+            console.log('❌ Farcaster SDK not available:', error);
+            getFallbackUserProfile();
+          }
+        } else if (walletEnvironment === 'coinbase') {
+          // Coinbase wallet environment
+          console.log('💰 Initializing for Coinbase wallet...');
           
-          const farcasterUser = {
-            username: context.user.username || `user${context.user.fid}`,
-            fid: context.user.fid,
-            displayName: context.user.displayName || context.user.username,
-            pfpUrl: context.user.pfpUrl || context.user.pfp
-          };
-          
-          console.log('✅ Processed Farcaster user:', farcasterUser);
-          setUserProfile(farcasterUser);
-          setIsInFarcaster(true);
-        } else {
-          console.log('❌ No user in context, using fallback');
-          setIsInFarcaster(false);
-          getFallbackUserProfile();
+          // Try to get user info from Coinbase wallet if available
+          if (window.ethereum?.isCoinbaseWallet) {
+            try {
+              const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+              if (accounts.length > 0) {
+                const coinbaseUser = {
+                  username: `coinbase_${accounts[0].slice(2, 8)}`,
+                  fid: accounts[0],
+                  displayName: `Coinbase User`,
+                  pfpUrl: null,
+                  walletAddress: accounts[0]
+                };
+                setUserProfile(coinbaseUser);
+                console.log('✅ Coinbase user profile created:', coinbaseUser);
+              } else {
+                getFallbackUserProfile();
+              }
+            } catch (error) {
+              console.log('❌ Failed to get Coinbase account:', error);
+              getFallbackUserProfile();
+            }
+          } else {
+            getFallbackUserProfile();
+          }
         }
         
         setInitializationComplete(true);
         
       } catch (error) {
-        console.log('❌ Farcaster SDK not available:', error);
-        setIsInFarcaster(false);
+        console.log('❌ Wallet environment initialization failed:', error);
         setInitializationComplete(true);
         getFallbackUserProfile();
       }
     };
-
-    initializeFarcasterSDK();
-  }, [getFallbackUserProfile]);
+    
+    initializeWalletEnvironment();
+  }, [getFallbackUserProfile, detectWalletEnvironment]);
 
   // Load shared leaderboard from API with better error handling
   const loadSharedLeaderboard = useCallback(async () => {
@@ -520,73 +595,57 @@ const InflyncedPuzzle = () => {
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
-    const appUrl = window.location.origin;
+    // Use your OFFICIAL Farcaster miniapp URL
+    const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
     const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
     // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
-        const shareResult = useCallback(async () => {
-  const timeInSeconds = (totalTime / 1000).toFixed(1);
-  // Use your OFFICIAL Farcaster miniapp URL
-  const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
-  const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
-  
-  // Use Farcaster composeCast if available, otherwise fallback
-  if (sdkInstance && isInFarcaster) {
-    try {
-      const shareResult = useCallback(async () => {
-  const timeInSeconds = (totalTime / 1000).toFixed(1);
-  const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
-  const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
-  
-  // Use Farcaster composeCast if available, otherwise fallback
-  if (sdkInstance && isInFarcaster) {
-    try {
-      const result = await sdkInstance.actions.composeCast({
-        text: text,
-        embeds: [appUrl]
-      });
-      
-      if (result?.cast) {
-        console.log('✅ Cast shared successfully:', result.cast.hash);
-      } else {
-        console.log('Cast sharing was cancelled');
+        const result = await sdkInstance.actions.composeCast({
+          text: text,
+          embeds: [appUrl]
+        });
+        
+        if (result?.cast) {
+          console.log('✅ Cast shared successfully:', result.cast.hash);
+        } else {
+          console.log('Cast sharing was cancelled');
+        }
+        return;
+      } catch (error) {
+        console.log('Failed to use Farcaster composeCast:', error);
       }
-      return;
-    } catch (error) {
-      console.log('Failed to use Farcaster composeCast:', error);
     }
-  }
-  
-  // Fallback to Web Share API or clipboard
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: 'InflyncedPuzzle - I solved it!',
-        text: text,
-        url: appUrl,
-      });
-    } catch (error) {
-      console.log('Web Share cancelled or failed:', error);
+    
+    // Fallback to Web Share API or clipboard
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'InflyncedPuzzle - I solved it!',
+          text: text,
+          url: appUrl,
+        });
+      } catch (error) {
+        console.log('Web Share cancelled or failed:', error);
+      }
+    } else {
+      // Clipboard fallback
+      try {
+        await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
+        window.alert('Result copied to clipboard!');
+      } catch (error) {
+        // Manual copy fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = `${text}\n\n${appUrl}`;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        window.alert('Result copied to clipboard!');
+      }
     }
-  } else {
-    // Clipboard fallback
-    try {
-      await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
-      window.alert('Result copied to clipboard!');
-    } catch (error) {
-      // Manual copy fallback
-      const textArea = document.createElement('textarea');
-      textArea.value = `${text}\n\n${appUrl}`;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      window.alert('Result copied to clipboard!');
-    }
-  }
-}, [totalTime, sdkInstance, isInFarcaster]);
+  }, [totalTime, sdkInstance, isInFarcaster]);
 
   const formatTime = (time) => {
     return (time / 1000).toFixed(1);
