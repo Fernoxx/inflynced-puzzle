@@ -1,12 +1,12 @@
 {
   "miniapp": {
     "name": "InflyncedPuzzle",
-    "version": "1",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
+    "version": "2",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=2",
     "homeUrl": "https://inflyncedpuzzle.vercel.app",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/frame-preview.png",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/preview-image.png?v=2",
     "buttonTitle": "🧩 Play Now",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=2",
     "splashBackgroundColor": "#FFAB91",
     "requiredCapabilities": [
       "actions.ready",
