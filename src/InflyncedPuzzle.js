@@ -528,14 +528,17 @@ const InflyncedPuzzle = () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     // Use your OFFICIAL Farcaster miniapp URL
     const appUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
-    const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
+    const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇\n\n${appUrl}`;
     
     // Use Farcaster composeCast if available, otherwise fallback
     if (sdkInstance && isInFarcaster) {
       try {
+        console.log('🔄 Attempting to share with URL:', appUrl);
         const result = await sdkInstance.actions.composeCast({
           text: text,
-          embeds: [appUrl]
+          embeds: [{
+            url: appUrl
+          }]
         });
         
         if (result?.cast) {
@@ -546,6 +549,8 @@ const InflyncedPuzzle = () => {
         return;
       } catch (error) {
         console.log('Failed to use Farcaster composeCast:', error);
+        console.log('Falling back to alternative share method...');
+        // If composeCast fails, fall through to the fallback methods
       }
     }
     
