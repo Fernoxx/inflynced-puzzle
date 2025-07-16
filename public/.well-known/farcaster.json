@@ -1,6 +1,6 @@
 {
   "miniapp": {
-    "version": "3",
+    "version": "vNext",
     "name": "InflyncedPuzzle",
     "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
     "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
