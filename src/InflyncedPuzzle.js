@@ -359,20 +359,22 @@ const InflyncedPuzzle = () => {
       id: Math.random(),
       x: Math.random() * 100,
       y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
-      speed: Math.random() * 0.5 + 0.1,
-      opacity: Math.random() * 0.5 + 0.1,
+      size: Math.random() * 2 + 1, // Smaller particles
+      speed: Math.random() * 0.3 + 0.1, // Slower movement
+      opacity: Math.random() * 0.3 + 0.1, // More subtle
+      angle: Math.random() * Math.PI * 2, // For more natural movement
     });
 
-    setParticles(Array.from({ length: 15 }, createParticle));
+    setParticles(Array.from({ length: 12 }, createParticle)); // Fewer particles
 
     const animateParticles = setInterval(() => {
       setParticles(prev => prev.map(particle => ({
         ...particle,
         y: particle.y > 100 ? -5 : particle.y + particle.speed,
-        x: particle.x + Math.sin(particle.y * 0.01) * 0.1,
+        x: particle.x + Math.sin(particle.y * 0.02 + particle.angle) * 0.15, // More natural drift
+        opacity: particle.opacity * 0.999, // Gradual fade
       })));
-    }, 50);
+    }, 100); // Less frequent updates
 
     return () => clearInterval(animateParticles);
   }, []);
@@ -419,7 +421,10 @@ const InflyncedPuzzle = () => {
     const newBoard = board.map(row => [...row]);
     let emptyRow = 2, emptyCol = 2;
     
-    for (let i = 0; i < 1000; i++) {
+    // Optimized shuffling - fewer moves but still random
+    const moves = 500 + Math.floor(Math.random() * 500); // 500-1000 moves
+    
+    for (let i = 0; i < moves; i++) {
       const directions = [];
       if (emptyRow > 0) directions.push({ dr: -1, dc: 0 });
       if (emptyRow < 2) directions.push({ dr: 1, dc: 0 });
@@ -885,6 +890,10 @@ const InflyncedPuzzle = () => {
                         height: 'min(96px, calc((100vw - 6rem) / 3))'
                       }}
                       onClick={() => makeMove(rowIndex, colIndex)}
+                      onTouchStart={(e) => {
+                        e.preventDefault(); // Prevent zoom on double tap
+                      }}
+                      onTouchEnd={() => makeMove(rowIndex, colIndex)}
                     >
                       {tile && !imageErrors.has(tile.image) && (
                         <div className="w-full h-full relative">
