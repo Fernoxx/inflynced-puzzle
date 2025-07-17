@@ -86,10 +86,17 @@ button:focus-visible {
   -webkit-touch-callout: none; /* Disable callout on iOS */
 }
 
-/* Enhanced puzzle tile styles */
+/* Enhanced puzzle container and tile styles */
+.puzzle-container {
+  width: 320px;
+  height: 320px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vw - 2rem);
+}
+
 .puzzle-tile {
-  width: 100px;
-  height: 100px;
+  width: 96px;
+  height: 96px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   overflow: hidden;
@@ -158,11 +165,14 @@ button:focus-visible {
 
 /* Mobile optimizations */
 @media (max-width: 480px) {
-  body {
-    font-size: 14px;
+  .puzzle-container {
+    width: 280px;
+    height: 280px;
   }
   
   .puzzle-tile {
+    width: 84px;
+    height: 84px;
     border-width: 1px;
   }
   

@@ -684,9 +684,9 @@ const InflyncedPuzzle = () => {
       };
 
   const getTileStyle = (tile) => {
-    // Calculate responsive tile size - matches the CSS calculation
-    const tileSize = Math.min(96, (window.innerWidth - 96) / 3); // 96 = 6rem in pixels
-    const totalSize = tileSize * 3;
+    // Use fixed tile size for consistent layout
+    const tileSize = 96; // matches CSS
+    const totalSize = tileSize * 3; // 288px total
     
     const backgroundX = -(tile.correctCol * tileSize);
     const backgroundY = -(tile.correctRow * tileSize);
@@ -999,28 +999,17 @@ const InflyncedPuzzle = () => {
             </div>
             
             <div className="flex justify-center mb-6">
-              <div className="relative grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30" 
-                   style={{ 
-                     width: 'min(320px, calc(100vw - 2rem))', 
-                     height: 'min(320px, calc(100vw - 2rem))' 
-                   }}>
+              <div className="puzzle-container relative grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30">
                 {board.map((row, rowIndex) =>
                   row.map((tile, colIndex) => (
                     <div
                       key={`${rowIndex}-${colIndex}`}
-                      className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
+                      className={`puzzle-tile relative rounded-lg overflow-hidden transition-all duration-200 ${
                         tile 
                           ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60 hover:shadow-xl' 
                           : 'bg-black/40 border-2 border-dashed border-white/50 animate-pulse'
                       } ${isPaused ? 'pointer-events-none filter blur-sm' : ''}`}
-                      style={tile ? {
-                        ...getTileStyle(tile),
-                        width: 'min(96px, calc((100vw - 6rem) / 3))',
-                        height: 'min(96px, calc((100vw - 6rem) / 3))'
-                      } : {
-                        width: 'min(96px, calc((100vw - 6rem) / 3))',
-                        height: 'min(96px, calc((100vw - 6rem) / 3))'
-                      }}
+                      style={tile ? getTileStyle(tile) : {}}
                       onClick={() => makeMove(rowIndex, colIndex)}
                       onTouchStart={(e) => {
                         e.preventDefault(); // Prevent zoom on double tap
