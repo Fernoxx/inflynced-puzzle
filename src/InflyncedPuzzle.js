@@ -502,10 +502,15 @@ const InflyncedPuzzle = () => {
       const newProgress = calculateProgress(newBoard);
       setProgress(newProgress);
       
-      playSound(440, 0.1);
+      // Play move sound with different tones based on progress
+      const frequency = 440 + (newProgress * 2); // Higher pitch as progress increases
+      playSound(frequency, 0.1);
       
       if (checkWin(newBoard)) {
-        playSound(660, 0.3);
+        // Victory sound sequence
+        playSound(660, 0.2);
+        setTimeout(() => playSound(880, 0.2), 100);
+        setTimeout(() => playSound(1100, 0.3), 200);
         
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
@@ -517,13 +522,12 @@ const InflyncedPuzzle = () => {
         } else {
           console.log('❌ Cannot submit score - missing user profile:', userProfile);
         }
-        
-        setTimeout(() => playSound(523, 0.2), 0);
-        setTimeout(() => playSound(659, 0.2), 200);
-        setTimeout(() => playSound(784, 0.4), 400);
       }
+    } else {
+      // Invalid move sound
+      playSound(200, 0.1, 'sawtooth');
     }
-  }, [gameState, emptyPos, board, playSound, checkWin, calculateProgress, startTime, userProfile, submitScore]);
+  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore]);
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
@@ -585,9 +589,11 @@ const InflyncedPuzzle = () => {
   const backgroundStyle = backgroundMode === 'solid' 
     ? {
         backgroundColor: '#B8460E',
+        backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
       }
     : {
-        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
+        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 30%, #FFAB91 70%, #FFE0B2 100%)`,
+        backgroundAttachment: 'fixed',
       };
 
   const getTileStyle = (tile) => {
@@ -603,7 +609,9 @@ const InflyncedPuzzle = () => {
       backgroundSize: `${totalSize}px ${totalSize}px`,
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat',
-      imageRendering: 'high-quality'
+      imageRendering: 'high-quality',
+      willChange: 'transform', // Performance optimization for animations
+      transform: 'translateZ(0)', // Hardware acceleration
     };
   };
 
