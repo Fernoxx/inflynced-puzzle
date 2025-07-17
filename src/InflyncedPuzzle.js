@@ -3,7 +3,7 @@
  * Features: Image-based puzzles, leaderboards, responsive design, keyboard controls
  */
 
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
@@ -447,6 +447,7 @@ const InflyncedPuzzle = () => {
       
       if (targetRow !== emptyPos.row || targetCol !== emptyPos.col) {
         e.preventDefault();
+        // eslint-disable-next-line no-use-before-define
         makeMove(targetRow, targetCol);
       }
     };
@@ -734,6 +735,17 @@ const InflyncedPuzzle = () => {
     };
   }, []);
 
+  // Preload next puzzle image for better performance
+  useEffect(() => {
+    if (currentPuzzle && currentPuzzle.id < IMAGE_PUZZLES.length) {
+      const nextPuzzle = IMAGE_PUZZLES.find(p => p.id === currentPuzzle.id + 1);
+      if (nextPuzzle) {
+        const img = new Image();
+        img.src = nextPuzzle.image;
+      }
+    }
+  }, [currentPuzzle]);
+
   // Show loading screen until initialization is complete
   if (!initializationComplete) {
     return (
@@ -753,17 +765,6 @@ const InflyncedPuzzle = () => {
       </div>
     );
   }
-
-  // Preload next puzzle image for better performance
-  useEffect(() => {
-    if (currentPuzzle && currentPuzzle.id < IMAGE_PUZZLES.length) {
-      const nextPuzzle = IMAGE_PUZZLES.find(p => p.id === currentPuzzle.id + 1);
-      if (nextPuzzle) {
-        const img = new Image();
-        img.src = nextPuzzle.image;
-      }
-    }
-  }, [currentPuzzle]);
 
   return (
     <div 
