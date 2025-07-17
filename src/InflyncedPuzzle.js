@@ -616,10 +616,15 @@ const InflyncedPuzzle = () => {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#B8460E' }}>
         <div className="text-white text-center">
-          <div className="text-6xl mb-4 animate-bounce">🧩</div>
-          <div className="text-xl mb-2">Loading InflyncedPuzzle...</div>
-          <div className="text-sm opacity-70">
+          <div className="text-7xl mb-6 animate-bounce">🧩</div>
+          <div className="text-2xl mb-4 font-bold">Loading InflyncedPuzzle...</div>
+          <div className="text-sm opacity-70 mb-4">
             Detecting Farcaster context...
+          </div>
+          <div className="flex justify-center space-x-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
           </div>
         </div>
       </div>
@@ -711,14 +716,14 @@ const InflyncedPuzzle = () => {
         )}
 
         {gameState === 'playing' && (
-          <div className="mb-4">
-            <div className="flex justify-between text-white text-sm mb-2">
-              <span>{progress.toFixed(1)}% Complete</span>
-              <span>{formatTime(currentTime)}s</span>
+          <div className="mb-6">
+            <div className="flex justify-between text-white text-sm mb-3">
+              <span className="font-semibold">{progress.toFixed(1)}% Complete</span>
+              <span className="font-mono font-bold">{formatTime(currentTime)}s</span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
+            <div className="w-full bg-white/20 rounded-full h-3 shadow-inner border border-white/30">
               <div 
-                className="bg-white rounded-full h-2 transition-all duration-300"
+                className="bg-gradient-to-r from-orange-400 to-orange-200 rounded-full h-3 transition-all duration-500 shadow-sm"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -850,8 +855,8 @@ const InflyncedPuzzle = () => {
                       key={`${rowIndex}-${colIndex}`}
                       className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
                         tile 
-                          ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60' 
-                          : 'bg-black/40 border-2 border-dashed border-white/50'
+                          ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60 hover:shadow-xl' 
+                          : 'bg-black/40 border-2 border-dashed border-white/50 animate-pulse'
                       }`}
                       style={tile ? {
                         ...getTileStyle(tile),
