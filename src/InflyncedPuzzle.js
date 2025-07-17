@@ -731,44 +731,44 @@ const InflyncedPuzzle = () => {
         )}
 
         {showLeaderboard && (
-          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-              <Trophy size={18} />
+          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 shadow-lg">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <Trophy size={20} />
               Live Leaderboard ({sharedLeaderboard.length} scores)
               <button
                 onClick={loadSharedLeaderboard}
                 disabled={isLoadingLeaderboard}
-                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center gap-1"
+                className="ml-auto text-sm bg-white/20 px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-white/30"
               >
-                <RefreshCw size={12} className={isLoadingLeaderboard ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={isLoadingLeaderboard ? 'animate-spin' : ''} />
                 Refresh
               </button>
             </h3>
             
             {leaderboardError && (
-              <div className="mb-3 text-red-300 text-sm bg-red-500/20 p-2 rounded">
+              <div className="mb-4 text-red-300 text-sm bg-red-500/20 p-3 rounded-lg border border-red-500/30">
                 ⚠️ API Error: {leaderboardError}
                 <br />Using cached data.
               </div>
             )}
             
             {isLoadingLeaderboard ? (
-              <div className="text-center text-white/70 py-8">
-                <div className="animate-spin text-2xl mb-2">🏆</div>
-                <div>Loading latest scores...</div>
+              <div className="text-center text-white/70 py-10">
+                <div className="animate-spin text-3xl mb-3">🏆</div>
+                <div className="font-semibold">Loading latest scores...</div>
               </div>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {sharedLeaderboard.length > 0 ? (
                   sharedLeaderboard.map((entry, index) => (
-                    <div key={`${entry.fid}-${entry.timestamp || index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded p-2 hover:bg-white/10 transition-colors">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="w-5 text-center font-bold flex-shrink-0">
+                    <div key={`${entry.fid}-${entry.timestamp || index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors border border-white/10">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="w-6 text-center font-bold flex-shrink-0 text-base">
                           {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
                         </span>
                         
                         {/* Profile Picture or Avatar */}
-                        <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/20 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 bg-white/20 flex items-center justify-center border border-white/30">
                           {entry.pfpUrl ? (
                             <img 
                               src={entry.pfpUrl} 
@@ -787,7 +787,7 @@ const InflyncedPuzzle = () => {
                         
                         {/* Username */}
                         <button 
-                          className="hover:text-white transition-colors hover:underline truncate min-w-0 text-left"
+                          className="hover:text-white transition-colors hover:underline truncate min-w-0 text-left font-medium"
                           onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
                           title={`View @${entry.username}'s Farcaster profile${entry.displayName ? ` (${entry.displayName})` : ''}`}
                         >
@@ -803,14 +803,14 @@ const InflyncedPuzzle = () => {
                       </div>
                       
                       {/* Time */}
-                      <span className="font-mono font-bold flex-shrink-0 ml-2">{entry.time}s</span>
+                      <span className="font-mono font-bold flex-shrink-0 ml-3 text-orange-200">{entry.time}s</span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center text-white/70 py-8">
-                    <div className="text-4xl mb-2">🏆</div>
-                    <div className="font-bold">No scores yet!</div>
-                    <div className="text-sm">Play a game to set the first record!</div>
+                  <div className="text-center text-white/70 py-10">
+                    <div className="text-5xl mb-3">🏆</div>
+                    <div className="font-bold text-lg">No scores yet!</div>
+                    <div className="text-sm mt-1">Play a game to set the first record!</div>
                   </div>
                 )}
               </div>
