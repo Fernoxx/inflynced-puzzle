@@ -413,6 +413,34 @@ const InflyncedPuzzle = () => {
     return () => clearInterval(timerRef.current);
   }, [gameState, startTime, isPaused]);
 
+  const checkWin = useCallback((board) => {
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (i === 2 && j === 2) continue;
+        if (!board[i][j] || board[i][j].correctRow !== i || board[i][j].correctCol !== j) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, []);
+
+  const calculateProgress = useCallback((board) => {
+    let correctTiles = 0;
+    const totalTiles = 8;
+    
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (i === 2 && j === 2) continue;
+        if (board[i][j] && board[i][j].correctRow === i && board[i][j].correctCol === j) {
+          correctTiles++;
+        }
+      }
+    }
+    
+    return (correctTiles / totalTiles) * 100;
+  }, []);
+
   const makeMove = useCallback((row, col) => {
     if (gameState !== 'playing' || isPaused) return;
     
@@ -428,7 +456,6 @@ const InflyncedPuzzle = () => {
       setBoard(newBoard);
       setEmptyPos({ row, col });
       
-      // eslint-disable-next-line no-use-before-define
       const newProgress = calculateProgress(newBoard);
       setProgress(newProgress);
       
@@ -436,7 +463,6 @@ const InflyncedPuzzle = () => {
       const frequency = 440 + (newProgress * 2); // Higher pitch as progress increases
       playSound(frequency, 0.1);
       
-      // eslint-disable-next-line no-use-before-define
       if (checkWin(newBoard)) {
         // Victory sound sequence
         playSound(660, 0.2);
@@ -473,7 +499,6 @@ const InflyncedPuzzle = () => {
       // Invalid move sound
       playSound(200, 0.1, 'sawtooth');
     }
-    // eslint-disable-next-line no-use-before-define
   }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore, isPaused]);
 
   // Keyboard navigation support
@@ -572,34 +597,6 @@ const InflyncedPuzzle = () => {
     }
     
     return { board: newBoard, emptyPos: { row: emptyRow, col: emptyCol } };
-  }, []);
-
-  const checkWin = useCallback((board) => {
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue;
-        if (!board[i][j] || board[i][j].correctRow !== i || board[i][j].correctCol !== j) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }, []);
-
-  const calculateProgress = useCallback((board) => {
-    let correctTiles = 0;
-    const totalTiles = 8;
-    
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue;
-        if (board[i][j] && board[i][j].correctRow === i && board[i][j].correctCol === j) {
-          correctTiles++;
-        }
-      }
-    }
-    
-    return (correctTiles / totalTiles) * 100;
   }, []);
 
   const startGame = useCallback(() => {
