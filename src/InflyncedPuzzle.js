@@ -406,6 +406,51 @@ const InflyncedPuzzle = () => {
     return () => clearInterval(timerRef.current);
   }, [gameState, startTime]);
 
+  // Keyboard navigation support
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (gameState !== 'playing') return;
+      
+      let targetRow = emptyPos.row;
+      let targetCol = emptyPos.col;
+      
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          if (emptyPos.row < 2) targetRow = emptyPos.row + 1;
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          if (emptyPos.row > 0) targetRow = emptyPos.row - 1;
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          if (emptyPos.col < 2) targetCol = emptyPos.col + 1;
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          if (emptyPos.col > 0) targetCol = emptyPos.col - 1;
+          break;
+        default:
+          return;
+      }
+      
+      if (targetRow !== emptyPos.row || targetCol !== emptyPos.col) {
+        e.preventDefault();
+        makeMove(targetRow, targetCol);
+      }
+    };
+    
+    if (gameState === 'playing') {
+      window.addEventListener('keydown', handleKeyPress);
+      return () => window.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [gameState, emptyPos, makeMove]);
+
   const generateBoard = useCallback((puzzleConfig) => {
     const image = puzzleConfig.image;
     let board = [];
@@ -914,6 +959,7 @@ const InflyncedPuzzle = () => {
           <div className="flex-1 flex flex-col justify-center">
             <div className="mb-4 text-center">
               <h3 className="text-white font-bold text-lg">Puzzle {currentPuzzle?.id}</h3>
+              <p className="text-white/60 text-xs mt-1">Use arrow keys or WASD to play</p>
             </div>
             
             <div className="flex justify-center mb-6">
