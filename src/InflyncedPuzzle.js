@@ -999,22 +999,58 @@ const InflyncedPuzzle = () => {
             </div>
             
             <div className="flex justify-center mb-6">
-              <div className="puzzle-container relative grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30">
+              <div 
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '8px',
+                  width: '320px',
+                  height: '320px',
+                  padding: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                  position: 'relative'
+                }}
+              >
                 {board.map((row, rowIndex) =>
                   row.map((tile, colIndex) => (
                     <div
                       key={`${rowIndex}-${colIndex}`}
-                      className={`puzzle-tile relative rounded-lg overflow-hidden transition-all duration-200 ${
-                        tile 
-                          ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60 hover:shadow-xl' 
-                          : 'bg-black/40 border-2 border-dashed border-white/50 animate-pulse'
-                      } ${isPaused ? 'pointer-events-none filter blur-sm' : ''}`}
-                      style={tile ? getTileStyle(tile) : {}}
+                      style={{
+                        width: '96px',
+                        height: '96px',
+                        borderRadius: '8px',
+                        border: tile ? '2px solid rgba(255, 255, 255, 0.3)' : '2px dashed rgba(255, 255, 255, 0.5)',
+                        backgroundColor: tile ? 'transparent' : 'rgba(0, 0, 0, 0.4)',
+                        cursor: tile ? 'pointer' : 'default',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
+                        ...(tile ? getTileStyle(tile) : {}),
+                        ...(isPaused ? { pointerEvents: 'none', filter: 'blur(2px)' } : {})
+                      }}
                       onClick={() => makeMove(rowIndex, colIndex)}
                       onTouchStart={(e) => {
-                        e.preventDefault(); // Prevent zoom on double tap
+                        e.preventDefault();
                       }}
                       onTouchEnd={() => makeMove(rowIndex, colIndex)}
+                      onMouseEnter={(e) => {
+                        if (tile) {
+                          e.target.style.transform = 'scale(1.05)';
+                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                          e.target.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (tile) {
+                          e.target.style.transform = 'scale(1)';
+                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                          e.target.style.boxShadow = 'none';
+                        }
+                      }}
                     >
                       {tile && !imageErrors.has(tile.image) && (
                         <div className="w-full h-full relative">
