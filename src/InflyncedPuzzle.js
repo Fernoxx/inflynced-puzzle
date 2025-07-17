@@ -656,23 +656,24 @@ const InflyncedPuzzle = () => {
             <img 
               src="/logo.png" 
               alt="InflyncedPuzzle Logo" 
-              className="w-8 h-8 rounded-lg"
+              className="w-8 h-8 rounded-lg shadow-sm"
               onError={(e) => {
                 e.target.style.display = 'none';
               }}
             />
-            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
+            <h1 className="text-2xl font-bold text-white drop-shadow-sm">InflyncedPuzzle</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
+              className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 hover:scale-105"
+              title="Toggle Leaderboard"
             >
               <Trophy size={20} />
             </button>
             <button
               onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
+              className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 hover:scale-105"
               title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
             >
               <Palette size={20} />
@@ -681,16 +682,16 @@ const InflyncedPuzzle = () => {
         </div>
 
         {userProfile && (
-          <div className="mb-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
-              <span className="text-white/80 text-sm">Playing as:</span>
+          <div className="mb-6 text-center">
+            <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/20 shadow-lg">
+              <span className="text-white/80 text-sm font-medium">Playing as:</span>
               <button
                 onClick={changeUsername}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   clearUsername();
                 }}
-                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
+                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline decoration-2 underline-offset-2"
                 title={isInFarcaster 
                   ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
                   : "Click to change username • Right-click to clear stored username"
@@ -699,17 +700,17 @@ const InflyncedPuzzle = () => {
                 @{userProfile.username}
               </button>
               {isInFarcaster && (
-                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded" title="Connected to Farcaster">
+                <span className="text-xs bg-green-500/20 text-green-300 px-2.5 py-1 rounded-lg border border-green-500/30 font-medium" title="Connected to Farcaster">
                   FC
                 </span>
               )}
               {isSubmittingScore && (
-                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded animate-pulse">
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg animate-pulse border border-blue-500/30">
                   Saving...
                 </span>
               )}
             </div>
-            <div className="text-xs text-white/50 mt-1">
+            <div className="text-xs text-white/50 mt-2 font-mono">
               FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
             </div>
           </div>
