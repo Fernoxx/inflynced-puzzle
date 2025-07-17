@@ -28,6 +28,7 @@ const InflyncedPuzzle = () => {
   const [startTime, setStartTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [particles, setParticles] = useState([]);
@@ -395,7 +396,7 @@ const InflyncedPuzzle = () => {
   }, []);
 
   useEffect(() => {
-    if (gameState === 'playing' && startTime) {
+    if (gameState === 'playing' && startTime && !isPaused) {
       timerRef.current = setInterval(() => {
         setCurrentTime(Date.now() - startTime);
       }, 100);
@@ -404,7 +405,7 @@ const InflyncedPuzzle = () => {
     }
 
     return () => clearInterval(timerRef.current);
-  }, [gameState, startTime]);
+  }, [gameState, startTime, isPaused]);
 
   // Keyboard navigation support
   useEffect(() => {
@@ -550,7 +551,7 @@ const InflyncedPuzzle = () => {
   }, [generateBoard, shuffleBoard, calculateProgress]);
 
   const makeMove = useCallback((row, col) => {
-    if (gameState !== 'playing') return;
+    if (gameState !== 'playing' || isPaused) return;
     
     const dr = Math.abs(row - emptyPos.row);
     const dc = Math.abs(col - emptyPos.col);
@@ -607,7 +608,7 @@ const InflyncedPuzzle = () => {
       // Invalid move sound
       playSound(200, 0.1, 'sawtooth');
     }
-  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore]);
+  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore, isPaused]);
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
@@ -837,7 +838,15 @@ const InflyncedPuzzle = () => {
           <div className="mb-6">
             <div className="flex justify-between text-white text-sm mb-3">
               <span className="font-semibold">{progress.toFixed(1)}% Complete</span>
-              <span className="font-mono font-bold">{formatTime(currentTime)}s</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  className="text-xs bg-white/20 px-3 py-1 rounded-lg hover:bg-white/30 transition-colors border border-white/30"
+                >
+                  {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+                </button>
+                <span className="font-mono font-bold">{formatTime(currentTime)}s</span>
+              </div>
             </div>
             <div className="w-full bg-white/20 rounded-full h-3 shadow-inner border border-white/30">
               <div 
@@ -963,7 +972,7 @@ const InflyncedPuzzle = () => {
             </div>
             
             <div className="flex justify-center mb-6">
-              <div className="grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30" 
+              <div className="relative grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30" 
                    style={{ 
                      width: 'min(320px, calc(100vw - 2rem))', 
                      height: 'min(320px, calc(100vw - 2rem))' 
@@ -976,7 +985,7 @@ const InflyncedPuzzle = () => {
                         tile 
                           ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60 hover:shadow-xl' 
                           : 'bg-black/40 border-2 border-dashed border-white/50 animate-pulse'
-                      }`}
+                      } ${isPaused ? 'pointer-events-none filter blur-sm' : ''}`}
                       style={tile ? {
                         ...getTileStyle(tile),
                         width: 'min(96px, calc((100vw - 6rem) / 3))',
@@ -1012,6 +1021,21 @@ const InflyncedPuzzle = () => {
                       )}
                     </div>
                   ))
+                )}
+                
+                {isPaused && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
+                    <div className="text-center text-white">
+                      <div className="text-4xl mb-2">⏸️</div>
+                      <div className="text-lg font-bold mb-2">Game Paused</div>
+                      <button
+                        onClick={() => setIsPaused(false)}
+                        className="bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-colors border border-white/30"
+                      >
+                        Resume Game
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
