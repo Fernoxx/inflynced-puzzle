@@ -779,7 +779,7 @@ const InflyncedPuzzle = () => {
                 e.target.style.display = 'none';
               }}
             />
-            <h1 className="text-2xl font-bold text-white drop-shadow-sm">InflyncedPuzzle</h1>
+            <h1 className="text-2xl font-bold text-white drop-shadow-lg">InflyncedPuzzle</h1>
           </div>
           <div className="flex gap-3">
             <button
