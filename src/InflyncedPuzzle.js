@@ -768,7 +768,7 @@ const InflyncedPuzzle = () => {
 
   return (
     <div 
-      className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board"
+      className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board flex items-center justify-center"
       style={backgroundStyle}
     >
       {particles.map(particle => (
@@ -785,30 +785,58 @@ const InflyncedPuzzle = () => {
         />
       ))}
 
-      <div className="relative z-10 container mx-auto px-4 py-4 max-w-md min-h-screen flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="InflyncedPuzzle Logo" 
-              className="w-8 h-8 rounded-lg shadow-sm"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <h1 className="text-2xl font-bold text-white drop-shadow-lg">InflyncedPuzzle</h1>
+      <div 
+        style={{
+          width: '400px',
+          maxWidth: 'calc(100vw - 2rem)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '24px',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          position: 'relative',
+          zIndex: 10,
+          minHeight: '500px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              InflyncedPuzzle
+            </h1>
           </div>
-          <div className="flex gap-3">
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 hover:scale-105"
+              style={{
+                padding: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
+                backdropFilter: 'blur(4px)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
               title="Toggle Leaderboard"
             >
               <Trophy size={20} />
             </button>
             <button
               onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm text-white hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 hover:scale-105"
+              style={{
+                padding: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
+                backdropFilter: 'blur(4px)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
               title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
             >
               <Palette size={20} />
@@ -817,16 +845,33 @@ const InflyncedPuzzle = () => {
         </div>
 
         {userProfile && (
-          <div className="mb-6 text-center">
-            <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/20 shadow-lg">
-              <span className="text-white/80 text-sm font-medium">Playing as:</span>
+          <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(4px)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', fontWeight: '500' }}>Playing as:</span>
               <button
                 onClick={changeUsername}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   clearUsername();
                 }}
-                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline decoration-2 underline-offset-2"
+                style={{
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
                 title={isInFarcaster 
                   ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
                   : "Click to change username • Right-click to clear stored username"
@@ -835,17 +880,20 @@ const InflyncedPuzzle = () => {
                 @{userProfile.username}
               </button>
               {isInFarcaster && (
-                <span className="text-xs bg-green-500/20 text-green-300 px-2.5 py-1 rounded-lg border border-green-500/30 font-medium" title="Connected to Farcaster">
+                <span style={{
+                  fontSize: '10px',
+                  backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                  color: 'rgb(134, 239, 172)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  fontWeight: '500'
+                }} title="Connected to Farcaster">
                   FC
                 </span>
               )}
-              {isSubmittingScore && (
-                <span className="text-xs bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg animate-pulse border border-blue-500/30">
-                  Saving...
-                </span>
-              )}
             </div>
-            <div className="text-xs text-white/50 mt-2 font-mono">
+            <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '4px', fontFamily: 'monospace' }}>
               FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
             </div>
           </div>
