@@ -633,6 +633,26 @@ const InflyncedPuzzle = () => {
     }
   };
 
+  // Error recovery for corrupted game state
+  useEffect(() => {
+    if (gameState === 'playing' && (!board || board.length === 0)) {
+      console.warn('⚠️ Corrupted game state detected, returning to menu');
+      setGameState('menu');
+    }
+  }, [gameState, board]);
+
+  // Prevent memory leaks on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
   // Show loading screen until initialization is complete
   if (!initializationComplete) {
     return (
