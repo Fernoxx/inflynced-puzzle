@@ -37,7 +37,6 @@ const InflyncedPuzzle = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
   const [userProfile, setUserProfile] = useState(null);
   const [imageErrors, setImageErrors] = useState(new Set());
@@ -46,8 +45,6 @@ const InflyncedPuzzle = () => {
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
-  const [leaderboardError, setLeaderboardError] = useState(null);
-  const [isSubmittingScore, setIsSubmittingScore] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -133,7 +130,6 @@ const InflyncedPuzzle = () => {
   // Load shared leaderboard from API with better error handling
   const loadSharedLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
-    setLeaderboardError(null);
     
     try {
       console.log('🔄 Loading leaderboard from API...');
@@ -160,7 +156,6 @@ const InflyncedPuzzle = () => {
       }
     } catch (error) {
       console.error('❌ Failed to load leaderboard:', error);
-      setLeaderboardError(error.message);
       
       // Fallback to localStorage if API fails
       try {
@@ -208,8 +203,6 @@ const InflyncedPuzzle = () => {
       console.error('❌ Cannot submit score - missing username or fid');
       return;
     }
-
-    setIsSubmittingScore(true);
 
     const scoreData = {
       username: username,
@@ -282,8 +275,6 @@ const InflyncedPuzzle = () => {
         console.error('❌ localStorage fallback also failed:', error);
       }
     }
-    
-    setIsSubmittingScore(false);
   }, [userProfile, loadSharedLeaderboard]);
 
   // Load leaderboard when component mounts
@@ -310,18 +301,6 @@ const InflyncedPuzzle = () => {
     }
   }, [userProfile, isInFarcaster]);
 
-  const clearUsername = useCallback(() => {
-    if (isInFarcaster) {
-      window.alert('Username is managed by Farcaster.');
-      return;
-    }
-    
-    if (window.confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
-      localStorage.removeItem('inflynced-user-profile');
-      getFallbackUserProfile();
-    }
-  }, [isInFarcaster, getFallbackUserProfile]);
-
   const playSound = useCallback((frequency, duration = 0.1, type = 'sine') => {
     if (!audioContextRef.current) return;
     
@@ -343,46 +322,6 @@ const InflyncedPuzzle = () => {
     } catch (e) {
       console.log('Sound error:', e);
     }
-  }, []);
-
-  useEffect(() => {
-    const createParticle = () => ({
-      id: Math.random(),
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2 + 1, // Smaller particles
-      speed: Math.random() * 0.3 + 0.1, // Slower movement
-      opacity: Math.random() * 0.3 + 0.1, // More subtle
-      angle: Math.random() * Math.PI * 2, // For more natural movement
-    });
-
-    setParticles(Array.from({ length: 12 }, createParticle)); // Fewer particles
-
-    const animateParticles = setInterval(() => {
-      setParticles(prev => prev.map(particle => {
-        if (particle.vx !== undefined) {
-          // Celebration particle physics
-          return {
-            ...particle,
-            x: particle.x + particle.vx,
-            y: particle.y + particle.vy,
-            vx: particle.vx * 0.98, // Friction
-            vy: particle.vy * 0.98 + 0.1, // Gravity
-            opacity: particle.opacity * 0.95, // Faster fade
-          };
-        } else {
-          // Regular floating particles
-          return {
-            ...particle,
-            y: particle.y > 100 ? -5 : particle.y + particle.speed,
-            x: particle.x + Math.sin(particle.y * 0.02 + particle.angle) * 0.15,
-            opacity: particle.opacity * 0.999,
-          };
-        }
-      }).filter(particle => particle.opacity > 0.01)); // Remove faded particles
-    }, 100);
-
-    return () => clearInterval(animateParticles);
   }, []);
 
   useEffect(() => {
@@ -452,21 +391,6 @@ const InflyncedPuzzle = () => {
         playSound(660, 0.2);
         setTimeout(() => playSound(880, 0.2), 100);
         setTimeout(() => playSound(1100, 0.3), 200);
-        
-        // Victory particle burst
-        const celebrationParticles = Array.from({ length: 20 }, () => ({
-          id: Math.random(),
-          x: 50 + (Math.random() - 0.5) * 30,
-          y: 50 + (Math.random() - 0.5) * 30,
-          size: Math.random() * 4 + 2,
-          speed: Math.random() * 2 + 1,
-          opacity: 1,
-          angle: Math.random() * Math.PI * 2,
-          vx: (Math.random() - 0.5) * 4,
-          vy: (Math.random() - 0.5) * 4,
-        }));
-        
-        setParticles(prev => [...prev, ...celebrationParticles]);
         
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
@@ -656,16 +580,6 @@ const InflyncedPuzzle = () => {
   const formatTime = (time) => {
     return (time / 1000).toFixed(1);
   };
-
-  const backgroundStyle = backgroundMode === 'solid' 
-    ? {
-        backgroundColor: '#B8460E',
-        backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
-      }
-    : {
-        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 30%, #FFAB91 70%, #FFE0B2 100%)`,
-        backgroundAttachment: 'fixed',
-      };
 
   const getTileStyle = (tile) => {
     // Use fixed tile size for consistent layout
