@@ -412,6 +412,69 @@ const InflyncedPuzzle = () => {
     return () => clearInterval(timerRef.current);
   }, [gameState, startTime, isPaused]);
 
+  const makeMove = useCallback((row, col) => {
+    if (gameState !== 'playing' || isPaused) return;
+    
+    const dr = Math.abs(row - emptyPos.row);
+    const dc = Math.abs(col - emptyPos.col);
+    
+    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+      const newBoard = board.map(r => [...r]);
+      
+      newBoard[emptyPos.row][emptyPos.col] = board[row][col];
+      newBoard[row][col] = null;
+      
+      setBoard(newBoard);
+      setEmptyPos({ row, col });
+      
+      // eslint-disable-next-line no-use-before-define
+      const newProgress = calculateProgress(newBoard);
+      setProgress(newProgress);
+      
+      // Play move sound with different tones based on progress
+      const frequency = 440 + (newProgress * 2); // Higher pitch as progress increases
+      playSound(frequency, 0.1);
+      
+      // eslint-disable-next-line no-use-before-define
+      if (checkWin(newBoard)) {
+        // Victory sound sequence
+        playSound(660, 0.2);
+        setTimeout(() => playSound(880, 0.2), 100);
+        setTimeout(() => playSound(1100, 0.3), 200);
+        
+        // Victory particle burst
+        const celebrationParticles = Array.from({ length: 20 }, () => ({
+          id: Math.random(),
+          x: 50 + (Math.random() - 0.5) * 30,
+          y: 50 + (Math.random() - 0.5) * 30,
+          size: Math.random() * 4 + 2,
+          speed: Math.random() * 2 + 1,
+          opacity: 1,
+          angle: Math.random() * Math.PI * 2,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+        }));
+        
+        setParticles(prev => [...prev, ...celebrationParticles]);
+        
+        const finalTime = Date.now() - startTime;
+        setTotalTime(finalTime);
+        setGameState('completed');
+        
+        if (userProfile && userProfile.username && userProfile.fid) {
+          console.log('🎯 Game won! Submitting score for user:', userProfile);
+          submitScore(finalTime, userProfile.username, userProfile.fid);
+        } else {
+          console.log('❌ Cannot submit score - missing user profile:', userProfile);
+        }
+      }
+    } else {
+      // Invalid move sound
+      playSound(200, 0.1, 'sawtooth');
+    }
+    // eslint-disable-next-line no-use-before-define
+  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore, isPaused]);
+
   // Keyboard navigation support
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -447,7 +510,6 @@ const InflyncedPuzzle = () => {
       
       if (targetRow !== emptyPos.row || targetCol !== emptyPos.col) {
         e.preventDefault();
-        // eslint-disable-next-line no-use-before-define
         makeMove(targetRow, targetCol);
       }
     };
@@ -555,66 +617,6 @@ const InflyncedPuzzle = () => {
     setCurrentTime(0);
     setGameState('playing');
   }, [generateBoard, shuffleBoard, calculateProgress]);
-
-  const makeMove = useCallback((row, col) => {
-    if (gameState !== 'playing' || isPaused) return;
-    
-    const dr = Math.abs(row - emptyPos.row);
-    const dc = Math.abs(col - emptyPos.col);
-    
-    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
-      const newBoard = board.map(r => [...r]);
-      
-      newBoard[emptyPos.row][emptyPos.col] = board[row][col];
-      newBoard[row][col] = null;
-      
-      setBoard(newBoard);
-      setEmptyPos({ row, col });
-      
-      const newProgress = calculateProgress(newBoard);
-      setProgress(newProgress);
-      
-      // Play move sound with different tones based on progress
-      const frequency = 440 + (newProgress * 2); // Higher pitch as progress increases
-      playSound(frequency, 0.1);
-      
-      if (checkWin(newBoard)) {
-        // Victory sound sequence
-        playSound(660, 0.2);
-        setTimeout(() => playSound(880, 0.2), 100);
-        setTimeout(() => playSound(1100, 0.3), 200);
-        
-        // Victory particle burst
-        const celebrationParticles = Array.from({ length: 20 }, () => ({
-          id: Math.random(),
-          x: 50 + (Math.random() - 0.5) * 30,
-          y: 50 + (Math.random() - 0.5) * 30,
-          size: Math.random() * 4 + 2,
-          speed: Math.random() * 2 + 1,
-          opacity: 1,
-          angle: Math.random() * Math.PI * 2,
-          vx: (Math.random() - 0.5) * 4,
-          vy: (Math.random() - 0.5) * 4,
-        }));
-        
-        setParticles(prev => [...prev, ...celebrationParticles]);
-        
-        const finalTime = Date.now() - startTime;
-        setTotalTime(finalTime);
-        setGameState('completed');
-        
-        if (userProfile && userProfile.username && userProfile.fid) {
-          console.log('🎯 Game won! Submitting score for user:', userProfile);
-          submitScore(finalTime, userProfile.username, userProfile.fid);
-        } else {
-          console.log('❌ Cannot submit score - missing user profile:', userProfile);
-        }
-      }
-    } else {
-      // Invalid move sound
-      playSound(200, 0.1, 'sawtooth');
-    }
-  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore, isPaused]);
 
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
