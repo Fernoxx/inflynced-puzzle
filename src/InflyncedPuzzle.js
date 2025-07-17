@@ -368,13 +368,28 @@ const InflyncedPuzzle = () => {
     setParticles(Array.from({ length: 12 }, createParticle)); // Fewer particles
 
     const animateParticles = setInterval(() => {
-      setParticles(prev => prev.map(particle => ({
-        ...particle,
-        y: particle.y > 100 ? -5 : particle.y + particle.speed,
-        x: particle.x + Math.sin(particle.y * 0.02 + particle.angle) * 0.15, // More natural drift
-        opacity: particle.opacity * 0.999, // Gradual fade
-      })));
-    }, 100); // Less frequent updates
+      setParticles(prev => prev.map(particle => {
+        if (particle.vx !== undefined) {
+          // Celebration particle physics
+          return {
+            ...particle,
+            x: particle.x + particle.vx,
+            y: particle.y + particle.vy,
+            vx: particle.vx * 0.98, // Friction
+            vy: particle.vy * 0.98 + 0.1, // Gravity
+            opacity: particle.opacity * 0.95, // Faster fade
+          };
+        } else {
+          // Regular floating particles
+          return {
+            ...particle,
+            y: particle.y > 100 ? -5 : particle.y + particle.speed,
+            x: particle.x + Math.sin(particle.y * 0.02 + particle.angle) * 0.15,
+            opacity: particle.opacity * 0.999,
+          };
+        }
+      }).filter(particle => particle.opacity > 0.01)); // Remove faded particles
+    }, 100);
 
     return () => clearInterval(animateParticles);
   }, []);
@@ -516,6 +531,21 @@ const InflyncedPuzzle = () => {
         playSound(660, 0.2);
         setTimeout(() => playSound(880, 0.2), 100);
         setTimeout(() => playSound(1100, 0.3), 200);
+        
+        // Victory particle burst
+        const celebrationParticles = Array.from({ length: 20 }, () => ({
+          id: Math.random(),
+          x: 50 + (Math.random() - 0.5) * 30,
+          y: 50 + (Math.random() - 0.5) * 30,
+          size: Math.random() * 4 + 2,
+          speed: Math.random() * 2 + 1,
+          opacity: 1,
+          angle: Math.random() * Math.PI * 2,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+        }));
+        
+        setParticles(prev => [...prev, ...celebrationParticles]);
         
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
