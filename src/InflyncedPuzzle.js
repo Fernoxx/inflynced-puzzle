@@ -616,7 +616,16 @@ const InflyncedPuzzle = () => {
   };
 
   const handleImageError = (imagePath) => {
+    console.warn('⚠️ Failed to load image:', imagePath);
     setImageErrors(prev => new Set([...prev, imagePath]));
+    
+    // If all images fail to load, show a helpful message
+    const totalImages = IMAGE_PUZZLES.length;
+    const failedImages = imageErrors.size + 1; // +1 for the current error
+    
+    if (failedImages > totalImages * 0.5) {
+      console.error('❌ Too many image loading failures. Check image paths.');
+    }
   };
 
   // Show loading screen until initialization is complete
