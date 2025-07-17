@@ -88,7 +88,7 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-      // Initialize SDK - works universally in Farcaster and Coinbase wallet
+  // Initialize SDK - works universally in Farcaster and Coinbase wallet
   useEffect(() => {
     const initializeMiniapp = async () => {
       try {
@@ -98,51 +98,35 @@ const InflyncedPuzzle = () => {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         setSdkInstance(sdk);
         
-        // CRITICAL: Always call ready() first - this dismisses the splash screen
-        await sdk.actions.ready();
-        console.log('✅ SDK ready() called successfully');
+        // Check if we're inside Farcaster context
+        setIsInFarcaster(true);
         
-        // Try to get context - this will work in Farcaster and gracefully fail in Coinbase
-        try {
-          console.log('🔍 Getting SDK context...');
-          const context = await sdk.context;
-          console.log('📋 Full SDK context:', context);
-          
-          // Extract real user data from context if available
-          if (context?.user) {
-            console.log('👤 Raw user data from context:', context.user);
-            
-            const farcasterUser = {
-              username: context.user.username || `user${context.user.fid}`,
-              fid: context.user.fid,
-              displayName: context.user.displayName || context.user.username,
-              pfpUrl: context.user.pfpUrl || context.user.pfp
-            };
-            
-            console.log('✅ Processed Farcaster user:', farcasterUser);
-            setUserProfile(farcasterUser);
-            setIsInFarcaster(true);
-          } else {
-            console.log('❌ No user in context, using fallback');
-            setIsInFarcaster(false);
-            getFallbackUserProfile();
-          }
-        } catch (contextError) {
-          console.log('ℹ️ Context not available (likely in Coinbase wallet), using fallback');
-          setIsInFarcaster(false);
+        // Get user data from SDK
+        const context = sdk.context;
+        if (context?.user) {
+          const userProfile = {
+            fid: context.user.fid || Math.random().toString(36).substring(7),
+            username: context.user.username || 'anonymous',
+            displayName: context.user.displayName,
+            pfpUrl: context.user.pfpUrl
+          };
+          setUserProfile(userProfile);
+          console.log('✅ Farcaster user profile:', userProfile);
+        } else {
+          console.log('❌ No Farcaster user context found');
           getFallbackUserProfile();
         }
         
         setInitializationComplete(true);
-        
+        console.log('✅ Miniapp initialized successfully!');
       } catch (error) {
-        console.log('ℹ️ SDK not available (likely in Coinbase wallet), using fallback');
+        console.log('❌ Farcaster SDK initialization failed:', error);
         setIsInFarcaster(false);
-        setInitializationComplete(true);
         getFallbackUserProfile();
+        setInitializationComplete(true);
       }
     };
-    
+
     initializeMiniapp();
   }, [getFallbackUserProfile]);
 
@@ -746,429 +730,466 @@ const InflyncedPuzzle = () => {
     }
   }, [currentPuzzle]);
 
-  // Show loading screen until initialization is complete
-  if (!initializationComplete) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#B8460E' }}>
-        <div className="text-white text-center">
-          <div className="text-7xl mb-6 animate-bounce">🧩</div>
-          <div className="text-2xl mb-4 font-bold">Loading InflyncedPuzzle...</div>
-          <div className="text-sm opacity-70 mb-4">
-            Detecting Farcaster context...
-          </div>
-          <div className="flex justify-center space-x-2">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div 
-      className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board flex items-center justify-center"
-      style={backgroundStyle}
-    >
-      {particles.map(particle => (
-        <div
-          key={particle.id}
-          className="absolute rounded-full bg-white pointer-events-none"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: `${particle.size}px`,
-            height: `${particle.size}px`,
-            opacity: particle.opacity,
-          }}
-        />
-      ))}
-
-      <div 
-        style={{
-          width: '400px',
-          maxWidth: 'calc(100vw - 2rem)',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-          padding: '24px',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          position: 'relative',
-          zIndex: 10,
-          minHeight: '500px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      {/* Compact Card Container */}
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px 12px 20px',
+          borderBottom: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h1 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              color: '#333', 
+              margin: 0
+            }}>
               InflyncedPuzzle
             </h1>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+                title="Toggle Leaderboard"
+              >
+                <Trophy size={16} />
+              </button>
+              <button
+                onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+                title="Toggle Background"
+              >
+                <Palette size={16} />
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              style={{
-                padding: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '8px',
-                backdropFilter: 'blur(4px)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              title="Toggle Leaderboard"
-            >
-              <Trophy size={20} />
-            </button>
-            <button
-              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              style={{
-                padding: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '8px',
-                backdropFilter: 'blur(4px)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
-            >
-              <Palette size={20} />
-            </button>
-          </div>
+
+          {userProfile && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                border: '1px solid #e9ecef'
+              }}>
+                <span style={{ color: '#666', fontSize: '11px' }}>Playing as:</span>
+                <button
+                  onClick={changeUsername}
+                  style={{
+                    color: '#333',
+                    fontWeight: '500',
+                    fontSize: '11px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  @{userProfile.username}
+                </button>
+                {isInFarcaster && (
+                  <span style={{
+                    fontSize: '9px',
+                    backgroundColor: '#e8f5e8',
+                    color: '#4caf50',
+                    padding: '1px 4px',
+                    borderRadius: '3px',
+                    fontWeight: '500'
+                  }}>
+                    FC
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
+                FID: {userProfile.fid.toString().substring(0, 6)} | In FC: {isInFarcaster ? 'Yes' : 'No'}
+              </div>
+            </div>
+          )}
         </div>
 
-        {userProfile && (
-          <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(4px)',
-              borderRadius: '8px',
-              padding: '8px 12px',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '12px', fontWeight: '500' }}>Playing as:</span>
-              <button
-                onClick={changeUsername}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  clearUsername();
-                }}
-                style={{
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-                title={isInFarcaster 
-                  ? `Real Farcaster user: ${userProfile.username} (FID: ${userProfile.fid})` 
-                  : "Click to change username • Right-click to clear stored username"
-                }
-              >
-                @{userProfile.username}
-              </button>
-              {isInFarcaster && (
-                <span style={{
-                  fontSize: '10px',
-                  backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                  color: 'rgb(134, 239, 172)',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  fontWeight: '500'
-                }} title="Connected to Farcaster">
-                  FC
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '4px', fontFamily: 'monospace' }}>
-              FID: {userProfile.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
-            </div>
-          </div>
-        )}
-
+        {/* Progress Bar (when playing) */}
         {gameState === 'playing' && (
-          <div className="mb-6">
-            <div className="flex justify-between text-white text-sm mb-3">
-              <span className="font-semibold">{progress.toFixed(1)}% Complete</span>
-              <div className="flex items-center gap-3">
+          <div style={{ padding: '12px 20px', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '12px' }}>
+              <span style={{ fontWeight: '500', color: '#333' }}>{progress.toFixed(1)}% Complete</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   onClick={() => setIsPaused(!isPaused)}
-                  className="text-xs bg-white/20 px-3 py-1 rounded-lg hover:bg-white/30 transition-colors border border-white/30"
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer'
+                  }}
                 >
                   {isPaused ? '▶️ Resume' : '⏸️ Pause'}
                 </button>
-                <span className="font-mono font-bold">{formatTime(currentTime)}s</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#333', fontSize: '12px' }}>
+                  {formatTime(currentTime)}s
+                </span>
               </div>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-3 shadow-inner border border-white/30">
-              <div 
-                className="bg-gradient-to-r from-orange-400 to-orange-200 rounded-full h-3 transition-all duration-500 shadow-sm relative overflow-hidden"
-                style={{ width: `${progress}%` }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showLeaderboard && (
-          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20 shadow-lg">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-              <Trophy size={20} />
-              Live Leaderboard ({sharedLeaderboard.length} scores)
-              <button
-                onClick={loadSharedLeaderboard}
-                disabled={isLoadingLeaderboard}
-                className="ml-auto text-sm bg-white/20 px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-white/30"
-              >
-                <RefreshCw size={14} className={isLoadingLeaderboard ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-            </h3>
-            
-            {leaderboardError && (
-              <div className="mb-4 text-red-300 text-sm bg-red-500/20 p-3 rounded-lg border border-red-500/30">
-                ⚠️ API Error: {leaderboardError}
-                <br />Using cached data.
-              </div>
-            )}
-            
-            {isLoadingLeaderboard ? (
-              <div className="text-center text-white/70 py-10">
-                <div className="animate-spin text-3xl mb-3">🏆</div>
-                <div className="font-semibold">Loading latest scores...</div>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {sharedLeaderboard.length > 0 ? (
-                  sharedLeaderboard.map((entry, index) => (
-                    <div key={`${entry.fid}-${entry.timestamp || index}`} className="flex items-center justify-between text-white/90 text-sm bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors border border-white/10">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="w-6 text-center font-bold flex-shrink-0 text-base">
-                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                        </span>
-                        
-                        {/* Profile Picture or Avatar */}
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 bg-white/20 flex items-center justify-center border border-white/30">
-                          {entry.pfpUrl ? (
-                            <img 
-                              src={entry.pfpUrl} 
-                              alt={`${entry.username}'s avatar`}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <span className={`text-xs ${entry.pfpUrl ? 'hidden' : 'block'}`}>
-                            {entry.avatar || "🧩"}
-                          </span>
-                        </div>
-                        
-                        {/* Username */}
-                        <button 
-                          className="hover:text-white transition-colors hover:underline truncate min-w-0 text-left font-medium"
-                          onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                          title={`View @${entry.username}'s Farcaster profile${entry.displayName ? ` (${entry.displayName})` : ''}`}
-                        >
-                          @{entry.username}
-                        </button>
-                        
-                        {/* Display name if different from username */}
-                        {entry.displayName && entry.displayName !== entry.username && (
-                          <span className="text-white/60 text-xs truncate">
-                            ({entry.displayName})
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Time */}
-                      <span className="font-mono font-bold flex-shrink-0 ml-3 text-orange-200">{entry.time}s</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center text-white/70 py-10">
-                    <div className="text-5xl mb-3">🏆</div>
-                    <div className="font-bold text-lg">No scores yet!</div>
-                    <div className="text-sm mt-1">Play a game to set the first record!</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {gameState === 'menu' && (
-          <div className="flex-1 flex flex-col justify-center text-center text-white">
-            <div className="mb-12">
-              <div className="text-7xl mb-6 animate-pulse">🧩</div>
-              <h2 className="text-2xl font-bold mb-3">Image Sliding Puzzle</h2>
-              <p className="text-white/80 mb-8 text-lg leading-relaxed">
-                Solve an image puzzle as fast as you can!
-              </p>
-            </div>
-            <button
-              onClick={startGame}
-              className="bg-white text-orange-600 px-10 py-5 rounded-xl font-bold text-xl hover:bg-white/90 transition-all duration-200 flex items-center gap-3 mx-auto shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              <Play size={28} />
-              Start Game
-            </button>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="mb-4 text-center">
-              <h3 className="text-white font-bold text-lg">Puzzle {currentPuzzle?.id}</h3>
-              <div className="flex items-center justify-center gap-2 mt-1">
-                <span className="text-white/60 text-xs">Difficulty:</span>
-                <div className="flex gap-1">
-                  {Array.from({ length: Math.min(3, Math.ceil(currentPuzzle?.id / 5)) }).map((_, i) => (
-                    <span key={i} className="text-orange-300 text-xs">⭐</span>
-                  ))}
-                </div>
-              </div>
-              <p className="text-white/60 text-xs mt-1">Use arrow keys or WASD to play</p>
-            </div>
-            
-            <div className="flex justify-center mb-6">
+            <div style={{
+              width: '100%',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '6px',
+              height: '6px',
+              overflow: 'hidden'
+            }}>
               <div 
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '8px',
-                  width: '320px',
-                  height: '320px',
-                  padding: '16px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '12px',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                  position: 'relative'
+                  background: 'linear-gradient(90deg, #ff7043, #ff5722)',
+                  borderRadius: '6px',
+                  height: '6px',
+                  transition: 'width 0.3s ease',
+                  width: `${progress}%`
                 }}
-              >
-                {board.map((row, rowIndex) =>
-                  row.map((tile, colIndex) => (
-                    <div
-                      key={`${rowIndex}-${colIndex}`}
-                      style={{
-                        width: '96px',
-                        height: '96px',
-                        borderRadius: '8px',
-                        border: tile ? '2px solid rgba(255, 255, 255, 0.3)' : '2px dashed rgba(255, 255, 255, 0.5)',
-                        backgroundColor: tile ? 'transparent' : 'rgba(0, 0, 0, 0.4)',
-                        cursor: tile ? 'pointer' : 'default',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        transition: 'all 0.2s ease-in-out',
-                        ...(tile ? getTileStyle(tile) : {}),
-                        ...(isPaused ? { pointerEvents: 'none', filter: 'blur(2px)' } : {})
-                      }}
-                      onClick={() => makeMove(rowIndex, colIndex)}
-                      onTouchStart={(e) => {
-                        e.preventDefault();
-                      }}
-                      onTouchEnd={() => makeMove(rowIndex, colIndex)}
-                      onMouseEnter={(e) => {
-                        if (tile) {
-                          e.target.style.transform = 'scale(1.05)';
-                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                          e.target.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (tile) {
-                          e.target.style.transform = 'scale(1)';
-                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                          e.target.style.boxShadow = 'none';
-                        }
-                      }}
-                    >
-                      {tile && !imageErrors.has(tile.image) && (
-                        <div className="w-full h-full relative">
-                          <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/80 px-1.5 py-0.5 rounded z-10 shadow-sm">
-                            {tile.value}
-                          </span>
-                          <img 
-                            src={tile.image} 
-                            alt={`Puzzle piece ${tile.value}`}
-                            className="hidden"
-                            onError={() => handleImageError(tile.image)}
-                            onLoad={(e) => e.target.style.display = 'none'}
-                          />
-                        </div>
-                      )}
-                      {tile && imageErrors.has(tile.image) && (
-                        <div className="w-full h-full flex items-center justify-center bg-orange-400">
-                          <span className="text-white font-bold text-lg">{tile.value}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-                
-                {isPaused && (
-                  <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-xl flex items-center justify-center z-20">
-                    <div className="text-center text-white">
-                      <div className="text-4xl mb-2">⏸️</div>
-                      <div className="text-lg font-bold mb-2">Game Paused</div>
-                      <button
-                        onClick={() => setIsPaused(false)}
-                        className="bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30 transition-colors border border-white/30"
-                      >
-                        Resume Game
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              />
             </div>
           </div>
         )}
 
-        {gameState === 'completed' && (
-          <div className="flex-1 flex flex-col justify-center text-center text-white">
-            <div className="text-6xl mb-6 animate-bounce">🏆</div>
-            <h2 className="text-3xl font-bold mb-3">Congratulations!</h2>
-            <p className="text-lg mb-8 text-white/90">
-              You solved the puzzle in <span className="font-bold text-orange-200">{formatTime(totalTime)}s</span>
-            </p>
-            
-            <div className="flex flex-col gap-4">
-              <button
-                onClick={shareResult}
-                className="bg-white text-orange-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/90 transition-all duration-200 flex items-center gap-3 justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                <Share2 size={24} />
-                Share Result
-              </button>
+        {/* Main Content Area */}
+        <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {showLeaderboard && (
+            <div style={{ 
+              marginBottom: '16px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '8px', 
+              padding: '12px',
+              border: '1px solid #e9ecef',
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  🏆 Leaderboard ({sharedLeaderboard.length})
+                </h3>
+                <button
+                  onClick={loadSharedLeaderboard}
+                  disabled={isLoadingLeaderboard}
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <RefreshCw size={10} />
+                </button>
+              </div>
               
+              {sharedLeaderboard.length > 0 ? (
+                <div style={{ fontSize: '11px' }}>
+                  {sharedLeaderboard.slice(0, 5).map((entry, index) => (
+                    <div key={`${entry.fid}-${entry.timestamp || index}`} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 6px',
+                      backgroundColor: index < 3 ? '#fff3e0' : 'white',
+                      borderRadius: '4px',
+                      marginBottom: '2px',
+                      border: '1px solid #f0f0f0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px' }}>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                        </span>
+                        <span style={{ fontWeight: '500' }}>@{entry.username}</span>
+                      </div>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#ff5722' }}>
+                        {entry.time}s
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666', fontSize: '12px' }}>
+                  🏆 No scores yet! Be the first!
+                </div>
+              )}
+            </div>
+          )}
+
+          {gameState === 'menu' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🧩</div>
+                <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Image Sliding Puzzle</h2>
+                <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+                  Solve an image puzzle as fast as you can!
+                </p>
+              </div>
               <button
-                onClick={() => setGameState('menu')}
-                className="bg-white/20 text-white px-8 py-4 rounded-xl backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center gap-3 justify-center border border-white/30 hover:border-white/50"
+                onClick={startGame}
+                style={{
+                  backgroundColor: '#ff5722',
+                  color: 'white',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: '0 auto',
+                  boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                }}
               >
-                <Play size={24} />
-                Play Again
+                <Play size={20} />
+                Start Game
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {gameState === 'playing' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: '0 0 4px 0' }}>
+                  Puzzle {currentPuzzle?.id}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#666', fontSize: '11px' }}>Difficulty:</span>
+                  <div style={{ display: 'flex', gap: '1px' }}>
+                    {Array.from({ length: Math.min(3, Math.ceil(currentPuzzle?.id / 5)) }).map((_, i) => (
+                      <span key={i} style={{ color: '#ff5722', fontSize: '11px' }}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+                <p style={{ color: '#666', fontSize: '10px', margin: 0 }}>Use arrow keys or WASD to play</p>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div 
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '4px',
+                    width: '240px',
+                    height: '240px',
+                    padding: '8px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    position: 'relative'
+                  }}
+                >
+                  {board.map((row, rowIndex) =>
+                    row.map((tile, colIndex) => (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        style={{
+                          width: '74px',
+                          height: '74px',
+                          borderRadius: '4px',
+                          border: tile ? '1px solid #e0e0e0' : '1px dashed #ccc',
+                          backgroundColor: tile ? '#fff' : '#f0f0f0',
+                          cursor: tile ? 'pointer' : 'default',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          transition: 'all 0.15s ease',
+                          ...(tile ? getTileStyle(tile) : {}),
+                          ...(isPaused ? { pointerEvents: 'none', filter: 'blur(1px)' } : {})
+                        }}
+                        onClick={() => makeMove(rowIndex, colIndex)}
+                        onTouchStart={(e) => e.preventDefault()}
+                        onTouchEnd={() => makeMove(rowIndex, colIndex)}
+                        onMouseEnter={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.borderColor = '#ff5722';
+                            e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.borderColor = '#e0e0e0';
+                            e.target.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {tile && !imageErrors.has(tile.image) && (
+                          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: '2px',
+                              color: 'white',
+                              fontWeight: '600',
+                              fontSize: '10px',
+                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              zIndex: 10
+                            }}>
+                              {tile.value}
+                            </span>
+                            <img 
+                              src={tile.image} 
+                              alt={`Puzzle piece ${tile.value}`}
+                              style={{ display: 'none' }}
+                              onError={() => handleImageError(tile.image)}
+                              onLoad={(e) => e.target.style.display = 'none'}
+                            />
+                          </div>
+                        )}
+                        {tile && imageErrors.has(tile.image) && (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#ff5722',
+                            color: 'white'
+                          }}>
+                            <span style={{ fontWeight: '600', fontSize: '14px' }}>{tile.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  
+                  {isPaused && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 20
+                    }}>
+                      <div style={{ textAlign: 'center', color: 'white' }}>
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏸️</div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Game Paused</div>
+                        <button
+                          onClick={() => setIsPaused(false)}
+                          style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            cursor: 'pointer',
+                            fontSize: '11px'
+                          }}
+                        >
+                          Resume Game
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'completed' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Congratulations!</h2>
+              <p style={{ fontSize: '14px', marginBottom: '20px', color: '#666' }}>
+                You solved the puzzle in <span style={{ fontWeight: '600', color: '#ff5722' }}>{formatTime(totalTime)}s</span>
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={shareResult}
+                  style={{
+                    backgroundColor: '#ff5722',
+                    color: 'white',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                  }}
+                >
+                  <Share2 size={18} />
+                  Share Result
+                </button>
+                
+                <button
+                  onClick={() => setGameState('menu')}
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Play size={18} />
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
