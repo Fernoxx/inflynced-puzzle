@@ -1,3 +1,8 @@
+/**
+ * InflyncedPuzzle - A sliding puzzle game for Farcaster
+ * Features: Image-based puzzles, leaderboards, responsive design, keyboard controls
+ */
+
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 
