@@ -835,41 +835,50 @@ const InflyncedPuzzle = () => {
               <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
             </div>
             
-            <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
-              {board.map((row, rowIndex) =>
-                row.map((tile, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`aspect-square rounded-md overflow-hidden transition-all duration-200 ${
-                      tile 
-                        ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/20' 
-                        : 'bg-black/30 border-2 border-dashed border-white/50'
-                    }`}
-                    style={tile ? getTileStyle(tile) : {}}
-                    onClick={() => makeMove(rowIndex, colIndex)}
-                  >
-                    {tile && !imageErrors.has(tile.image) && (
-                      <div className="w-full h-full relative">
-                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
-                          {tile.value}
-                        </span>
-                        <img 
-                          src={tile.image} 
-                          alt={`Puzzle piece ${tile.value}`}
-                          className="hidden"
-                          onError={() => handleImageError(tile.image)}
-                          onLoad={(e) => e.target.style.display = 'none'}
-                        />
-                      </div>
-                    )}
-                    {tile && imageErrors.has(tile.image) && (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
-                        <span className="text-white font-bold text-lg">{tile.value}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+            <div className="flex justify-center mb-4">
+              <div className="grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm" style={{ width: '320px', height: '320px' }}>
+                {board.map((row, rowIndex) =>
+                  row.map((tile, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
+                        tile 
+                          ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/30 hover:border-white/60' 
+                          : 'bg-black/40 border-2 border-dashed border-white/50'
+                      }`}
+                      style={tile ? {
+                        ...getTileStyle(tile),
+                        width: '96px',
+                        height: '96px'
+                      } : {
+                        width: '96px',
+                        height: '96px'
+                      }}
+                      onClick={() => makeMove(rowIndex, colIndex)}
+                    >
+                      {tile && !imageErrors.has(tile.image) && (
+                        <div className="w-full h-full relative">
+                          <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/80 px-1.5 py-0.5 rounded z-10 shadow-sm">
+                            {tile.value}
+                          </span>
+                          <img 
+                            src={tile.image} 
+                            alt={`Puzzle piece ${tile.value}`}
+                            className="hidden"
+                            onError={() => handleImageError(tile.image)}
+                            onLoad={(e) => e.target.style.display = 'none'}
+                          />
+                        </div>
+                      )}
+                      {tile && imageErrors.has(tile.image) && (
+                        <div className="w-full h-full flex items-center justify-center bg-orange-400">
+                          <span className="text-white font-bold text-lg">{tile.value}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
