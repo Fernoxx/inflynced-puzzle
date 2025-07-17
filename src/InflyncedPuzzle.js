@@ -590,17 +590,15 @@ const InflyncedPuzzle = () => {
       };
 
   const getTileStyle = (tile) => {
-    if (!tile) return {};
-    
-    const tileSize = 100;
-    const backgroundX = -(tile.correctPos.col * tileSize);
-    const backgroundY = -(tile.correctPos.row * tileSize);
+    const backgroundX = -(tile.col * 96);
+    const backgroundY = -(tile.row * 96);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '300px 300px',
+      backgroundSize: '288px 288px', // 96px * 3 = 288px for 3x3 grid
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
-      backgroundRepeat: 'no-repeat'
+      backgroundRepeat: 'no-repeat',
+      imageRendering: 'high-quality'
     };
   };
 
