@@ -403,9 +403,10 @@ const InflyncedPuzzle = () => {
           board[i][j] = {
             value: tileIndex + 1,
             image: image,
-            row: i,
-            col: j,
-            correctPos: { row: i, col: j }
+            row: i, // Current position row
+            col: j, // Current position col
+            correctRow: i, // Correct position row
+            correctCol: j  // Correct position col
           };
           tileIndex++;
         }
@@ -442,7 +443,7 @@ const InflyncedPuzzle = () => {
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
         if (i === 2 && j === 2) continue;
-        if (!board[i][j] || board[i][j].correctPos.row !== i || board[i][j].correctPos.col !== j) {
+        if (!board[i][j] || board[i][j].correctRow !== i || board[i][j].correctCol !== j) {
           return false;
         }
       }
@@ -457,7 +458,7 @@ const InflyncedPuzzle = () => {
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
         if (i === 2 && j === 2) continue;
-        if (board[i][j] && board[i][j].correctPos.row === i && board[i][j].correctPos.col === j) {
+        if (board[i][j] && board[i][j].correctRow === i && board[i][j].correctCol === j) {
           correctTiles++;
         }
       }
@@ -590,8 +591,8 @@ const InflyncedPuzzle = () => {
       };
 
   const getTileStyle = (tile) => {
-    const backgroundX = -(tile.col * 96);
-    const backgroundY = -(tile.row * 96);
+    const backgroundX = -(tile.correctCol * 96);
+    const backgroundY = -(tile.correctRow * 96);
     
     return {
       backgroundImage: `url(${tile.image})`,
