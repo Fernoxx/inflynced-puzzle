@@ -754,6 +754,17 @@ const InflyncedPuzzle = () => {
     );
   }
 
+  // Preload next puzzle image for better performance
+  useEffect(() => {
+    if (currentPuzzle && currentPuzzle.id < IMAGE_PUZZLES.length) {
+      const nextPuzzle = IMAGE_PUZZLES.find(p => p.id === currentPuzzle.id + 1);
+      if (nextPuzzle) {
+        const img = new Image();
+        img.src = nextPuzzle.image;
+      }
+    }
+  }, [currentPuzzle]);
+
   return (
     <div 
       className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board"
