@@ -591,12 +591,16 @@ const InflyncedPuzzle = () => {
       };
 
   const getTileStyle = (tile) => {
-    const backgroundX = -(tile.correctCol * 96);
-    const backgroundY = -(tile.correctRow * 96);
+    // Calculate responsive tile size - matches the CSS calculation
+    const tileSize = Math.min(96, (window.innerWidth - 96) / 3); // 96 = 6rem in pixels
+    const totalSize = tileSize * 3;
+    
+    const backgroundX = -(tile.correctCol * tileSize);
+    const backgroundY = -(tile.correctRow * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '288px 288px', // 96px * 3 = 288px for 3x3 grid
+      backgroundSize: `${totalSize}px ${totalSize}px`,
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat',
       imageRendering: 'high-quality'
@@ -641,8 +645,8 @@ const InflyncedPuzzle = () => {
         />
       ))}
 
-      <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
-        <div className="flex justify-between items-center mb-6">
+      <div className="relative z-10 container mx-auto px-4 py-4 max-w-md min-h-screen flex flex-col">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <img 
               src="/logo.png" 
@@ -829,13 +833,17 @@ const InflyncedPuzzle = () => {
         )}
 
         {gameState === 'playing' && (
-          <div>
+          <div className="flex-1 flex flex-col justify-center">
             <div className="mb-4 text-center">
-              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
+              <h3 className="text-white font-bold text-lg">Puzzle {currentPuzzle?.id}</h3>
             </div>
             
-            <div className="flex justify-center mb-4">
-              <div className="grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm" style={{ width: '320px', height: '320px' }}>
+            <div className="flex justify-center mb-6">
+              <div className="grid grid-cols-3 gap-2 bg-white/20 p-4 rounded-xl shadow-2xl backdrop-blur-sm border border-white/30" 
+                   style={{ 
+                     width: 'min(320px, calc(100vw - 2rem))', 
+                     height: 'min(320px, calc(100vw - 2rem))' 
+                   }}>
                 {board.map((row, rowIndex) =>
                   row.map((tile, colIndex) => (
                     <div
@@ -847,11 +855,11 @@ const InflyncedPuzzle = () => {
                       }`}
                       style={tile ? {
                         ...getTileStyle(tile),
-                        width: '96px',
-                        height: '96px'
+                        width: 'min(96px, calc((100vw - 6rem) / 3))',
+                        height: 'min(96px, calc((100vw - 6rem) / 3))'
                       } : {
-                        width: '96px',
-                        height: '96px'
+                        width: 'min(96px, calc((100vw - 6rem) / 3))',
+                        height: 'min(96px, calc((100vw - 6rem) / 3))'
                       }}
                       onClick={() => makeMove(rowIndex, colIndex)}
                     >
