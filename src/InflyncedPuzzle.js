@@ -814,19 +814,19 @@ const InflyncedPuzzle = () => {
         )}
 
         {gameState === 'menu' && (
-          <div className="text-center text-white">
-            <div className="mb-8">
-              <div className="text-6xl mb-4">🧩</div>
-              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
-              <p className="text-white/80 mb-6">
+          <div className="flex-1 flex flex-col justify-center text-center text-white">
+            <div className="mb-12">
+              <div className="text-7xl mb-6 animate-pulse">🧩</div>
+              <h2 className="text-2xl font-bold mb-3">Image Sliding Puzzle</h2>
+              <p className="text-white/80 mb-8 text-lg leading-relaxed">
                 Solve an image puzzle as fast as you can!
               </p>
             </div>
             <button
               onClick={startGame}
-              className="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-white/90 transition-colors flex items-center gap-2 mx-auto"
+              className="bg-white text-orange-600 px-10 py-5 rounded-xl font-bold text-xl hover:bg-white/90 transition-all duration-200 flex items-center gap-3 mx-auto shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              <Play size={24} />
+              <Play size={28} />
               Start Game
             </button>
           </div>
@@ -891,27 +891,27 @@ const InflyncedPuzzle = () => {
         )}
 
         {gameState === 'completed' && (
-          <div className="text-center text-white">
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
-            <p className="text-lg mb-6">
-              You solved the puzzle in <span className="font-bold">{formatTime(totalTime)}s</span>
+          <div className="flex-1 flex flex-col justify-center text-center text-white">
+            <div className="text-6xl mb-6 animate-bounce">🏆</div>
+            <h2 className="text-3xl font-bold mb-3">Congratulations!</h2>
+            <p className="text-lg mb-8 text-white/90">
+              You solved the puzzle in <span className="font-bold text-orange-200">{formatTime(totalTime)}s</span>
             </p>
             
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <button
                 onClick={shareResult}
-                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
+                className="bg-white text-orange-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/90 transition-all duration-200 flex items-center gap-3 justify-center shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                                  <Share2 size={20} />
-                  Share Result
+                <Share2 size={24} />
+                Share Result
               </button>
               
               <button
                 onClick={() => setGameState('menu')}
-                className="bg-white/20 text-white px-6 py-3 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors flex items-center gap-2 justify-center"
+                className="bg-white/20 text-white px-8 py-4 rounded-xl backdrop-blur-sm hover:bg-white/30 transition-all duration-200 flex items-center gap-3 justify-center border border-white/30 hover:border-white/50"
               >
-                <Play size={20} />
+                <Play size={24} />
                 Play Again
               </button>
             </div>
