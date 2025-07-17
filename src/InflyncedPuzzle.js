@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
@@ -850,9 +850,11 @@ const InflyncedPuzzle = () => {
             </div>
             <div className="w-full bg-white/20 rounded-full h-3 shadow-inner border border-white/30">
               <div 
-                className="bg-gradient-to-r from-orange-400 to-orange-200 rounded-full h-3 transition-all duration-500 shadow-sm"
+                className="bg-gradient-to-r from-orange-400 to-orange-200 rounded-full h-3 transition-all duration-500 shadow-sm relative overflow-hidden"
                 style={{ width: `${progress}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+              </div>
             </div>
           </div>
         )}
@@ -968,6 +970,14 @@ const InflyncedPuzzle = () => {
           <div className="flex-1 flex flex-col justify-center">
             <div className="mb-4 text-center">
               <h3 className="text-white font-bold text-lg">Puzzle {currentPuzzle?.id}</h3>
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <span className="text-white/60 text-xs">Difficulty:</span>
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(3, Math.ceil(currentPuzzle?.id / 5)) }).map((_, i) => (
+                    <span key={i} className="text-orange-300 text-xs">⭐</span>
+                  ))}
+                </div>
+              </div>
               <p className="text-white/60 text-xs mt-1">Use arrow keys or WASD to play</p>
             </div>
             
