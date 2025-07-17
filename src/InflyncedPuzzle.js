@@ -26,12 +26,10 @@ const InflyncedPuzzle = () => {
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
   const [startTime, setStartTime] = useState(null);
-  const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -159,13 +157,6 @@ const InflyncedPuzzle = () => {
     }
   }, [userProfile]);
 
-  const clearUsername = useCallback(() => {
-    if (window.confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
-      localStorage.removeItem('inflynced-user-profile');
-      getUserProfile();
-    }
-  }, [getUserProfile]);
-
   useEffect(() => {
     loadLeaderboard();
     getUserProfile();
@@ -192,29 +183,6 @@ const InflyncedPuzzle = () => {
     } catch (e) {
       console.log('Sound error:', e);
     }
-  }, []);
-
-  useEffect(() => {
-    const createParticle = () => ({
-      id: Math.random(),
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
-      speed: Math.random() * 0.5 + 0.1,
-      opacity: Math.random() * 0.5 + 0.1,
-    });
-
-    setParticles(Array.from({ length: 15 }, createParticle));
-
-    const animateParticles = setInterval(() => {
-      setParticles(prev => prev.map(particle => ({
-        ...particle,
-        y: particle.y > 100 ? -5 : particle.y + particle.speed,
-        x: particle.x + Math.sin(particle.y * 0.01) * 0.1,
-      })));
-    }, 50);
-
-    return () => clearInterval(animateParticles);
   }, []);
 
   useEffect(() => {
@@ -348,7 +316,6 @@ const InflyncedPuzzle = () => {
         
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
-        setEndTime(Date.now());
         setGameState('completed');
         
         if (userProfile) {
@@ -383,24 +350,16 @@ const InflyncedPuzzle = () => {
     return (time / 1000).toFixed(1);
   };
 
-  const backgroundStyle = backgroundMode === 'solid' 
-    ? {
-        backgroundColor: '#B8460E',
-      }
-    : {
-        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
-      };
-
   const getTileStyle = (tile) => {
     if (!tile) return {};
     
-    const tileSize = 100;
+    const tileSize = 74; // Updated for new compact design
     const backgroundX = -(tile.correctPos.col * tileSize);
     const backgroundY = -(tile.correctPos.row * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '300px 300px',
+      backgroundSize: '222px 222px', // 3 * 74 = 222
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat'
     };
@@ -411,225 +370,401 @@ const InflyncedPuzzle = () => {
   };
 
   return (
-    <div 
-      className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board"
-      style={backgroundStyle}
-    >
-      {particles.map(particle => (
-        <div
-          key={particle.id}
-          className="absolute rounded-full bg-white pointer-events-none"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: `${particle.size}px`,
-            height: `${particle.size}px`,
-            opacity: particle.opacity,
-          }}
-        />
-      ))}
-
-      <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="InflyncedPuzzle Logo" 
-              className="w-8 h-8 rounded-lg"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-            >
-              <Trophy size={20} />
-            </button>
-            <button
-              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
-            >
-              <Palette size={20} />
-            </button>
-          </div>
-        </div>
-
-        {userProfile && (
-          <div className="mb-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
-              <span className="text-white/80 text-sm">Playing as:</span>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      {/* Compact Card Container */}
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px 12px 20px',
+          borderBottom: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h1 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              color: '#333', 
+              margin: 0
+            }}>
+              InflyncedPuzzle
+            </h1>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
-                onClick={changeUsername}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  clearUsername();
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
                 }}
-                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
-                title="Click to change username • Right-click to clear stored username"
+                title="Toggle Leaderboard"
               >
-                @{userProfile.username}
+                <Trophy size={16} />
+              </button>
+              <button
+                onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+                title="Toggle Background"
+              >
+                <Palette size={16} />
               </button>
             </div>
           </div>
-        )}
 
-        {gameState === 'playing' && (
-          <div className="mb-4">
-            <div className="flex justify-between text-white text-sm mb-2">
-              <span>{progress.toFixed(1)}% Complete</span>
-              <span>{formatTime(currentTime)}s</span>
+          {userProfile && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                border: '1px solid #e9ecef'
+              }}>
+                <span style={{ color: '#666', fontSize: '11px' }}>Playing as:</span>
+                <button
+                  onClick={changeUsername}
+                  style={{
+                    color: '#333',
+                    fontWeight: '500',
+                    fontSize: '11px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  @{userProfile.username}
+                </button>
+              </div>
+              <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
+                FID: 242597 | In FC: Yes
+              </div>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
+          )}
+        </div>
+
+        {/* Progress Bar (when playing) */}
+        {gameState === 'playing' && (
+          <div style={{ padding: '12px 20px', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '12px' }}>
+              <span style={{ fontWeight: '500', color: '#333' }}>{progress.toFixed(1)}% Complete</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#333', fontSize: '12px' }}>
+                {formatTime(currentTime)}s
+              </span>
+            </div>
+            <div style={{
+              width: '100%',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '6px',
+              height: '6px',
+              overflow: 'hidden'
+            }}>
               <div 
-                className="bg-white rounded-full h-2 transition-all duration-300"
-                style={{ width: `${progress}%` }}
+                style={{
+                  background: 'linear-gradient(90deg, #ff7043, #ff5722)',
+                  borderRadius: '6px',
+                  height: '6px',
+                  transition: 'width 0.3s ease',
+                  width: `${progress}%`
+                }}
               />
             </div>
           </div>
         )}
 
-        {showLeaderboard && (
-          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-              <Trophy size={18} />
-              Leaderboard
-              <button
-                onClick={loadLeaderboard}
-                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
-              >
-                Refresh
-              </button>
-            </h3>
-            
-            {isLoadingLeaderboard ? (
-              <div className="text-center text-white/70 py-4">
-                Loading scores...
+        {/* Main Content Area */}
+        <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {showLeaderboard && (
+            <div style={{ 
+              marginBottom: '16px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '8px', 
+              padding: '12px',
+              border: '1px solid #e9ecef',
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  🏆 Leaderboard ({leaderboard.length})
+                </h3>
+                <button
+                  onClick={loadLeaderboard}
+                  disabled={isLoadingLeaderboard}
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Refresh
+                </button>
               </div>
-            ) : leaderboard.length > 0 ? (
-              <div className="space-y-2">
-                {leaderboard.map((entry, index) => (
-                  <div key={`${entry.fid}-${entry.timestamp}`} className="flex items-center justify-between text-white/90 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 text-center font-bold">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                      </span>
-                      <span className="text-lg">{entry.avatar}</span>
-                      <button 
-                        className="hover:text-white transition-colors hover:underline"
-                        onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                        title={`View @${entry.username}'s profile`}
-                      >
-                        @{entry.username}
-                      </button>
-                    </div>
-                    <span className="font-mono">{entry.time}s</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-white/70 py-4">
-                No scores yet. Be the first to play!
-              </div>
-            )}
-          </div>
-        )}
-
-        {gameState === 'menu' && (
-          <div className="text-center text-white">
-            <div className="mb-8">
-              <div className="text-6xl mb-4">🧩</div>
-              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
-              <p className="text-white/80 mb-6">
-                Solve an image puzzle as fast as you can!
-              </p>
-            </div>
-            <button
-              onClick={startGame}
-              className="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-white/90 transition-colors flex items-center gap-2 mx-auto"
-            >
-              <Play size={24} />
-              Start Game
-            </button>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div>
-            <div className="mb-4 text-center">
-              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
-              {board.map((row, rowIndex) =>
-                row.map((tile, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`aspect-square rounded-md overflow-hidden transition-all duration-200 ${
-                      tile 
-                        ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/20' 
-                        : 'bg-black/30 border-2 border-dashed border-white/50'
-                    }`}
-                    style={tile ? getTileStyle(tile) : {}}
-                    onClick={() => makeMove(rowIndex, colIndex)}
-                  >
-                    {tile && !imageErrors.has(tile.image) && (
-                      <div className="w-full h-full relative">
-                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
-                          {tile.value}
+              
+              {leaderboard.length > 0 ? (
+                <div style={{ fontSize: '11px' }}>
+                  {leaderboard.slice(0, 5).map((entry, index) => (
+                    <div key={`${entry.fid}-${entry.timestamp || index}`} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 6px',
+                      backgroundColor: index < 3 ? '#fff3e0' : 'white',
+                      borderRadius: '4px',
+                      marginBottom: '2px',
+                      border: '1px solid #f0f0f0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px' }}>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
                         </span>
-                        <img 
-                          src={tile.image} 
-                          alt={`Puzzle piece ${tile.value}`}
-                          className="hidden"
-                          onError={() => handleImageError(tile.image)}
-                          onLoad={(e) => e.target.style.display = 'none'}
-                        />
+                        <span style={{ fontWeight: '500' }}>@{entry.username}</span>
                       </div>
-                    )}
-                    {tile && imageErrors.has(tile.image) && (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
-                        <span className="text-white font-bold text-lg">{tile.value}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#ff5722' }}>
+                        {entry.time}s
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666', fontSize: '12px' }}>
+                  🏆 No scores yet! Be the first!
+                </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {gameState === 'completed' && (
-          <div className="text-center text-white">
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
-            <p className="text-lg mb-6">
-              You solved the puzzle in <span className="font-bold">{formatTime(totalTime)}s</span>
-            </p>
-            
-            <div className="flex flex-col gap-3">
+          {gameState === 'menu' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🧩</div>
+                <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Image Sliding Puzzle</h2>
+                <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+                  Solve an image puzzle as fast as you can!
+                </p>
+              </div>
               <button
-                onClick={shareResult}
-                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
-              >
-                <Share2 size={20} />
-                Share Result
-              </button>
-              
-              <button
-                onClick={() => setGameState('menu')}
-                className="bg-white/20 text-white px-6 py-3 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors flex items-center gap-2 justify-center"
+                onClick={startGame}
+                style={{
+                  backgroundColor: '#ff5722',
+                  color: 'white',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: '0 auto',
+                  boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                }}
               >
                 <Play size={20} />
-                Play Again
+                Start Game
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {gameState === 'playing' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: '0 0 4px 0' }}>
+                  Puzzle {currentPuzzle?.id}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#666', fontSize: '11px' }}>Difficulty:</span>
+                  <div style={{ display: 'flex', gap: '1px' }}>
+                    {Array.from({ length: Math.min(3, Math.ceil(currentPuzzle?.id / 5)) }).map((_, i) => (
+                      <span key={i} style={{ color: '#ff5722', fontSize: '11px' }}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+                <p style={{ color: '#666', fontSize: '10px', margin: 0 }}>Use arrow keys or WASD to play</p>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div 
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '4px',
+                    width: '240px',
+                    height: '240px',
+                    padding: '8px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef'
+                  }}
+                >
+                  {board.map((row, rowIndex) =>
+                    row.map((tile, colIndex) => (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        style={{
+                          width: '74px',
+                          height: '74px',
+                          borderRadius: '4px',
+                          border: tile ? '1px solid #e0e0e0' : '1px dashed #ccc',
+                          backgroundColor: tile ? '#fff' : '#f0f0f0',
+                          cursor: tile ? 'pointer' : 'default',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          transition: 'all 0.15s ease',
+                          ...(tile ? getTileStyle(tile) : {})
+                        }}
+                        onClick={() => makeMove(rowIndex, colIndex)}
+                        onMouseEnter={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.borderColor = '#ff5722';
+                            e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.borderColor = '#e0e0e0';
+                            e.target.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {tile && !imageErrors.has(tile.image) && (
+                          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: '2px',
+                              color: 'white',
+                              fontWeight: '600',
+                              fontSize: '10px',
+                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              zIndex: 10
+                            }}>
+                              {tile.value}
+                            </span>
+                            <img 
+                              src={tile.image} 
+                              alt={`Puzzle piece ${tile.value}`}
+                              style={{ display: 'none' }}
+                              onError={() => handleImageError(tile.image)}
+                              onLoad={(e) => e.target.style.display = 'none'}
+                            />
+                          </div>
+                        )}
+                        {tile && imageErrors.has(tile.image) && (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#ff5722',
+                            color: 'white'
+                          }}>
+                            <span style={{ fontWeight: '600', fontSize: '14px' }}>{tile.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'completed' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Congratulations!</h2>
+              <p style={{ fontSize: '14px', marginBottom: '20px', color: '#666' }}>
+                You solved the puzzle in <span style={{ fontWeight: '600', color: '#ff5722' }}>{formatTime(totalTime)}s</span>
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={shareResult}
+                  style={{
+                    backgroundColor: '#ff5722',
+                    color: 'white',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                  }}
+                >
+                  <Share2 size={18} />
+                  Share Result
+                </button>
+                
+                <button
+                  onClick={() => setGameState('menu')}
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Play size={18} />
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
