@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@farcaster/miniapp-sdk": "^0.1.0",
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "ethers": "^6.8.0",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
+    "wagmi": "^1.4.0",
+    "viem": "^1.19.0",
+    "@wagmi/core": "^1.4.0",
+    "@wagmi/connectors": "^3.1.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
