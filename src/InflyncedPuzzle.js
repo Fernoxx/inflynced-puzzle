@@ -104,9 +104,7 @@ const InflyncedPuzzle = () => {
   const [imageErrors, setImageErrors] = useState(new Set());
   const [currentUser, setCurrentUser] = useState({ username: '@anonymous', fid: null, displayName: 'Anonymous', pfpUrl: null });
   
-  // Wallet states
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState(null);
+  // App states
   const [isMiniapp, setIsMiniapp] = useState(false);
   const [snowParticles, setSnowParticles] = useState([]);
   const [showSnow, setShowSnow] = useState(false);
@@ -280,9 +278,6 @@ const InflyncedPuzzle = () => {
         });
         
         if (accounts && accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-          setWalletConnected(true);
-          
           // Switch to Base network automatically using Farcaster's built-in wallet
           try {
             await sdk.wallet.ethereum.request({
@@ -314,8 +309,6 @@ const InflyncedPuzzle = () => {
           });
           
           if (requestedAccounts && requestedAccounts.length > 0) {
-            setWalletAddress(requestedAccounts[0]);
-            setWalletConnected(true);
             console.log('✅ Farcaster built-in wallet access granted:', requestedAccounts[0]);
             return true;
           }
@@ -496,7 +489,7 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Submit score to contract (with wallet integration)
+  // Submit score to contract (automatic transaction after puzzle completion)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
     setIsSubmittingScore(true);
     
@@ -521,25 +514,28 @@ const InflyncedPuzzle = () => {
         time: timeInSeconds,
         timestamp: Date.now(),
         puzzleId,
-        onchainPending: !walletConnected
+        onchainPending: true
       };
       scores.push(newScore);
       scores.sort((a, b) => parseFloat(a.time) - parseFloat(b.time));
       localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
       setLeaderboard(scores.slice(0, 10));
       
-      // If wallet is connected, submit to contract
-      if (walletConnected && walletAddress && isMiniapp) {
+      // Automatically attempt onchain submission in Farcaster miniapp
+      if (isMiniapp) {
         try {
           // Use Farcaster SDK built-in wallet for transactions
           const { sdk } = await import('@farcaster/miniapp-sdk');
           
           if (sdk.wallet?.ethereum) {
+            console.log('🔗 Automatically submitting to contract via Farcaster built-in wallet...');
+            
+            // Get the wallet provider
             const provider = new ethers.providers.Web3Provider(sdk.wallet.ethereum);
             const signer = provider.getSigner();
             const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
             
-            console.log('🔗 Submitting to contract via Farcaster built-in wallet...');
+            // Automatically trigger transaction signing
             const tx = await contract.submitScore(
               fid,
               username,
@@ -561,15 +557,17 @@ const InflyncedPuzzle = () => {
           
         } catch (contractError) {
           console.error('❌ Contract submission failed:', contractError);
-          alert(`Score saved locally!\n\nTime: ${timeInSeconds}s\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nPlease ensure you have Base ETH for gas fees.`);
+          
+          // Check if user rejected the transaction
+          if (contractError.code === 4001 || contractError.message.includes('User rejected')) {
+            alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Transaction was cancelled. Your score is saved locally and you can submit to the onchain leaderboard later.`);
+          } else {
+            alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nPlease ensure you have Base ETH for gas fees.`);
+          }
         }
       } else {
-        // Wallet not connected or not in miniapp
-        if (isMiniapp) {
-          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ Wallet auto-detection is active. Scores will be submitted onchain automatically when wallet is available.`);
-        } else {
-          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, please access this app through Farcaster or Coinbase Wallet.`);
-        }
+        // Not in miniapp environment
+        alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, please access this app through Farcaster or Coinbase Wallet.`);
       }
       
       return true;
@@ -580,7 +578,7 @@ const InflyncedPuzzle = () => {
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [currentUser, walletConnected, walletAddress]);
+  }, [currentUser, isMiniapp]);
 
   // Load leaderboard on component mount
   useEffect(() => {
@@ -1110,21 +1108,15 @@ const InflyncedPuzzle = () => {
                 </div>
               )}
               
-              {/* Wallet Status Display */}
+              {/* Onchain Status Display */}
               {isMiniapp && (
                 <div style={{ marginTop: '12px', padding: '8px', borderTop: '1px solid #f0f0f0' }}>
-                                  {walletConnected ? (
                   <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
-                    ✅ Farcaster Wallet Connected
+                    ⛓️ Onchain Leaderboard Active
                     <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                      {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+                      Scores auto-submit to Base after completion
                     </div>
                   </div>
-                ) : (
-                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
-                    🔗 Farcaster Built-in Wallet Ready
-                  </div>
-                )}
                 </div>
               )}
             </div>
