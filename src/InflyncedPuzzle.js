@@ -521,53 +521,88 @@ const InflyncedPuzzle = () => {
       localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
       setLeaderboard(scores.slice(0, 10));
       
-      // Automatically attempt onchain submission in Farcaster miniapp
-      if (isMiniapp) {
-        try {
-          // Use Farcaster SDK built-in wallet for transactions
-          const { sdk } = await import('@farcaster/miniapp-sdk');
-          
-          if (sdk.wallet?.ethereum) {
-            console.log('🔗 Automatically submitting to contract via Farcaster built-in wallet...');
+      // Automatically attempt onchain submission
+      console.log('🔍 Attempting onchain submission...');
+      console.log('isMiniapp:', isMiniapp);
+      console.log('window.ethereum:', !!window.ethereum);
+      
+      try {
+        let provider = null;
+        
+        // Try multiple wallet sources
+        if (isMiniapp) {
+          try {
+            // First try Farcaster SDK
+            const { sdk } = await import('@farcaster/miniapp-sdk');
+            console.log('SDK loaded:', !!sdk);
+            console.log('SDK wallet:', !!sdk.wallet);
+            console.log('SDK wallet ethereum:', !!sdk.wallet?.ethereum);
             
-            // Get the wallet provider
-            const provider = new ethers.providers.Web3Provider(sdk.wallet.ethereum);
-            const signer = provider.getSigner();
-            const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
-            
-            // Automatically trigger transaction signing
-            const tx = await contract.submitScore(
-              fid,
-              username,
-              Math.round(time),
-              puzzleId
-            );
-            
-            console.log('⏳ Transaction sent:', tx.hash);
-            alert(`🎉 Score submitted onchain!\n\nTime: ${timeInSeconds}s\nTransaction: ${tx.hash}\n\nView on BaseScan: https://basescan.org/tx/${tx.hash}`);
-            
-            // Update the score to mark as onchain
-            newScore.onchainPending = false;
-            newScore.txHash = tx.hash;
-            localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
-            setLeaderboard(scores.slice(0, 10));
-          } else {
-            throw new Error('Farcaster built-in wallet not available');
-          }
-          
-        } catch (contractError) {
-          console.error('❌ Contract submission failed:', contractError);
-          
-          // Check if user rejected the transaction
-          if (contractError.code === 4001 || contractError.message.includes('User rejected')) {
-            alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Transaction was cancelled. Your score is saved locally and you can submit to the onchain leaderboard later.`);
-          } else {
-            alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nPlease ensure you have Base ETH for gas fees.`);
+            if (sdk.wallet?.ethereum) {
+              console.log('🔗 Using Farcaster SDK built-in wallet...');
+              provider = new ethers.providers.Web3Provider(sdk.wallet.ethereum);
+            }
+          } catch (sdkError) {
+            console.log('SDK error:', sdkError);
           }
         }
-      } else {
-        // Not in miniapp environment
-        alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, please access this app through Farcaster or Coinbase Wallet.`);
+        
+        // Fallback to window.ethereum if SDK not available
+        if (!provider && window.ethereum) {
+          console.log('🔗 Fallback to window.ethereum...');
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+        }
+        
+        if (provider) {
+          console.log('🔗 Provider found, submitting to contract...');
+          
+          // Ensure we're on Base network
+          try {
+            await provider.send('wallet_switchEthereumChain', [{ chainId: '0x2105' }]);
+          } catch (switchError) {
+            if (switchError.code === 4902) {
+              await provider.send('wallet_addEthereumChain', [{
+                chainId: '0x2105',
+                chainName: 'Base',
+                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                rpcUrls: ['https://mainnet.base.org'],
+                blockExplorerUrls: ['https://basescan.org/'],
+              }]);
+            }
+          }
+          
+          const signer = provider.getSigner();
+          const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
+          
+          // Automatically trigger transaction signing
+          const tx = await contract.submitScore(
+            fid,
+            username,
+            Math.round(time),
+            puzzleId
+          );
+          
+          console.log('⏳ Transaction sent:', tx.hash);
+          alert(`🎉 Score submitted onchain!\n\nTime: ${timeInSeconds}s\nTransaction: ${tx.hash}\n\nView on BaseScan: https://basescan.org/tx/${tx.hash}`);
+          
+          // Update the score to mark as onchain
+          newScore.onchainPending = false;
+          newScore.txHash = tx.hash;
+          localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
+          setLeaderboard(scores.slice(0, 10));
+        } else {
+          throw new Error('No wallet provider available');
+        }
+        
+      } catch (contractError) {
+        console.error('❌ Contract submission failed:', contractError);
+        
+        // Check if user rejected the transaction
+        if (contractError.code === 4001 || contractError.message.includes('User rejected')) {
+          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Transaction was cancelled. Your score is saved locally and you can submit to the onchain leaderboard later.`);
+        } else {
+          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nPlease ensure you have Base ETH for gas fees.`);
+        }
       }
       
       return true;
@@ -749,10 +784,10 @@ const InflyncedPuzzle = () => {
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     const text = `🧩 I just solved the InflyncedPuzzle in ${timeInSeconds} seconds! Can you beat my time?`;
-    const miniappUrl = "https://inflynced-puzzle.vercel.app";
+    const miniappUrl = "https://inflyncedpuzzle.vercel.app";
     
-    // Create the full cast text
-    const castText = `${text}\n\nPlay now: ${miniappUrl}\n\n#InflyncedPuzzle #Farcaster #Puzzle #Gaming`;
+    // Create the simple cast text without hashtags
+    const castText = `${text}\n\nPlay now: ${miniappUrl}`;
     
     try {
       // Try to use Farcaster SDK if available
