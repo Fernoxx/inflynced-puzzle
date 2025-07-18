@@ -107,7 +107,6 @@ const InflyncedPuzzle = () => {
   // Wallet states
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
-  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
   const [isMiniapp, setIsMiniapp] = useState(false);
   const [snowParticles, setSnowParticles] = useState([]);
   const [showSnow, setShowSnow] = useState(false);
@@ -263,6 +262,61 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewUser]);
 
+  // Automatic Farcaster wallet detection and connection
+  const initializeFarcasterWallet = useCallback(async () => {
+    if (!isMiniapp) return;
+    
+    try {
+      // Import Farcaster SDK and access wallet
+      const { sdk } = await import('@farcaster/miniapp-sdk');
+      
+      // Check if wallet is available
+      if (sdk.wallet?.ethereum) {
+        console.log('🔗 Farcaster wallet detected, connecting automatically...');
+        
+        // Get accounts from Farcaster wallet
+        const accounts = await sdk.wallet.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        
+        if (accounts && accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          setWalletConnected(true);
+          
+          // Switch to Base network automatically
+          try {
+            await sdk.wallet.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x2105' }], // Base mainnet
+            });
+          } catch (switchError) {
+            if (switchError.code === 4902) {
+              await sdk.wallet.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: '0x2105',
+                  chainName: 'Base',
+                  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                  rpcUrls: ['https://mainnet.base.org'],
+                  blockExplorerUrls: ['https://basescan.org/'],
+                }],
+              });
+            }
+          }
+          
+          console.log('✅ Farcaster wallet connected automatically:', accounts[0]);
+          return true;
+        }
+      } else {
+        console.log('⚠️ Farcaster wallet not available');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize Farcaster wallet:', error);
+      return false;
+    }
+  }, [isMiniapp]);
+
   // Initialize Farcaster miniapp and user system
   useEffect(() => {
     const initializeFarcasterUser = async () => {
@@ -300,6 +354,9 @@ const InflyncedPuzzle = () => {
               // Call ready to hide loading screen
               await sdk.actions.ready();
               console.log('✅ Farcaster miniapp ready');
+              
+              // Initialize wallet automatically
+              await initializeFarcasterWallet();
             } else {
               console.log('⚠️ No user context available');
               createFallbackUser();
@@ -343,7 +400,7 @@ const InflyncedPuzzle = () => {
 
     // Small delay to show loading screen
     setTimeout(initializeFarcasterUser, 1000);
-  }, [createFallbackUser]);
+  }, [createFallbackUser, initializeFarcasterWallet]);
 
   // Test contract connection on load
   useEffect(() => {
@@ -418,64 +475,6 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Farcaster miniapp wallet integration
-  const connectFarcasterWallet = useCallback(async () => {
-    setIsConnectingWallet(true);
-    
-    try {
-      // Check if we're in a Farcaster miniapp environment
-      if (isMiniapp) {
-        // Use Farcaster's built-in wallet
-        if (window.ethereum) {
-          const accounts = await window.ethereum.request({ 
-            method: 'eth_requestAccounts' 
-          });
-          
-          if (accounts && accounts.length > 0) {
-            setWalletAddress(accounts[0]);
-            setWalletConnected(true);
-            
-            // Switch to Base network
-            try {
-              await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x2105' }], // Base mainnet
-              });
-            } catch (switchError) {
-              if (switchError.code === 4902) {
-                await window.ethereum.request({
-                  method: 'wallet_addEthereumChain',
-                  params: [{
-                    chainId: '0x2105',
-                    chainName: 'Base',
-                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                    rpcUrls: ['https://mainnet.base.org'],
-                    blockExplorerUrls: ['https://basescan.org/'],
-                  }],
-                });
-              }
-            }
-            
-            console.log('✅ Farcaster wallet connected:', accounts[0]);
-            return true;
-          }
-        } else {
-          alert('⚠️ Wallet not available in this Farcaster client. Please use Warpcast or a compatible client.');
-          return false;
-        }
-      } else {
-        alert('⚠️ This feature only works in Farcaster miniapps. Please access this app through Farcaster.');
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Failed to connect Farcaster wallet:', error);
-      alert('Failed to connect wallet. Please try again.');
-      return false;
-    } finally {
-      setIsConnectingWallet(false);
-    }
-  }, [isMiniapp]);
-
   // Submit score to contract (with wallet integration)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
     setIsSubmittingScore(true);
@@ -509,36 +508,47 @@ const InflyncedPuzzle = () => {
       setLeaderboard(scores.slice(0, 10));
       
       // If wallet is connected, submit to contract
-      if (walletConnected && walletAddress) {
+      if (walletConnected && walletAddress && isMiniapp) {
         try {
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          const signer = provider.getSigner();
-          const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
+          // Use Farcaster SDK wallet for transactions
+          const { sdk } = await import('@farcaster/miniapp-sdk');
           
-          console.log('🔗 Submitting to contract...');
-          const tx = await contract.submitScore(
-            fid,
-            username,
-            Math.round(time),
-            puzzleId
-          );
-          
-          console.log('⏳ Transaction sent:', tx.hash);
-          alert(`🎉 Score submitted onchain!\n\nTime: ${timeInSeconds}s\nTransaction: ${tx.hash}\n\nView on BaseScan: https://basescan.org/tx/${tx.hash}`);
-          
-          // Update the score to mark as onchain
-          newScore.onchainPending = false;
-          newScore.txHash = tx.hash;
-          localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
-          setLeaderboard(scores.slice(0, 10));
+          if (sdk.wallet?.ethereum) {
+            const provider = new ethers.providers.Web3Provider(sdk.wallet.ethereum);
+            const signer = provider.getSigner();
+            const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
+            
+            console.log('🔗 Submitting to contract via Farcaster wallet...');
+            const tx = await contract.submitScore(
+              fid,
+              username,
+              Math.round(time),
+              puzzleId
+            );
+            
+            console.log('⏳ Transaction sent:', tx.hash);
+            alert(`🎉 Score submitted onchain!\n\nTime: ${timeInSeconds}s\nTransaction: ${tx.hash}\n\nView on BaseScan: https://basescan.org/tx/${tx.hash}`);
+            
+            // Update the score to mark as onchain
+            newScore.onchainPending = false;
+            newScore.txHash = tx.hash;
+            localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
+            setLeaderboard(scores.slice(0, 10));
+          } else {
+            throw new Error('Farcaster wallet not available');
+          }
           
         } catch (contractError) {
           console.error('❌ Contract submission failed:', contractError);
-          alert(`Score saved locally!\n\nTime: ${timeInSeconds}s\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nTry connecting your wallet and ensure you have Base ETH for gas fees.`);
+          alert(`Score saved locally!\n\nTime: ${timeInSeconds}s\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nPlease ensure you have Base ETH for gas fees.`);
         }
       } else {
-        // Wallet not connected - show connection prompt
-        alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, tap "Connect Base Wallet" and ensure you have Base ETH for gas fees.`);
+        // Wallet not connected or not in miniapp
+        if (isMiniapp) {
+          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ Wallet auto-detection is active. Scores will be submitted onchain automatically when wallet is available.`);
+        } else {
+          alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, please access this app through Farcaster or Coinbase Wallet.`);
+        }
       }
       
       return true;
@@ -1079,36 +1089,23 @@ const InflyncedPuzzle = () => {
                 </div>
               )}
               
-              {/* Wallet Connection Button */}
-              <div style={{ marginTop: '12px', padding: '8px', borderTop: '1px solid #f0f0f0' }}>
-                {walletConnected ? (
-                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
-                    ✅ Base Wallet Connected
-                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                      {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+              {/* Wallet Status Display */}
+              {isMiniapp && (
+                <div style={{ marginTop: '12px', padding: '8px', borderTop: '1px solid #f0f0f0' }}>
+                  {walletConnected ? (
+                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
+                      ✅ Base Wallet Connected
+                      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                        {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={connectFarcasterWallet}
-                    disabled={isConnectingWallet}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#2196F3',
-                      color: 'white',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      fontWeight: '600',
-                      fontSize: '12px',
-                      border: 'none',
-                      cursor: isConnectingWallet ? 'not-allowed' : 'pointer',
-                      opacity: isConnectingWallet ? 0.7 : 1
-                    }}
-                  >
-                    {isConnectingWallet ? '🔄 Connecting...' : '🔗 Connect Base Wallet'}
-                  </button>
-                )}
-              </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
+                      🔗 Wallet Auto-Detection Active
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
