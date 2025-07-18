@@ -1025,27 +1025,49 @@ const InflyncedPuzzle = () => {
                   </p>
                 )}
               </div>
-              <button
-                onClick={startGame}
-                style={{
-                  backgroundColor: '#ff5722',
-                  color: 'white',
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  fontSize: '16px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  margin: '0 auto',
-                  boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
-                }}
-              >
-                <Play size={20} />
-                Start Game
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <button
+                  onClick={startGame}
+                  style={{
+                    backgroundColor: '#ff5722',
+                    color: 'white',
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '16px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                  }}
+                >
+                  <Play size={20} />
+                  Start Game
+                </button>
+                
+                <button
+                  onClick={() => setShowSnow(!showSnow)}
+                  style={{
+                    backgroundColor: showSnow ? '#2196F3' : '#ff5722',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 8px rgba(255, 87, 34, 0.2)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {showSnow ? '❄️ Stop Snow' : '❄️ Make it Snow'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1220,6 +1242,37 @@ const InflyncedPuzzle = () => {
           )}
         </div>
       </div>
+      
+      {/* Snow Animation Overlay */}
+      {showSnow && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 1000
+        }}>
+          {snowParticles.map(flake => (
+            <div
+              key={flake.id}
+              style={{
+                position: 'absolute',
+                left: `${flake.x}px`,
+                top: `${flake.y}px`,
+                width: `${flake.size}px`,
+                height: `${flake.size}px`,
+                backgroundColor: 'white',
+                borderRadius: '50%',
+                opacity: flake.opacity,
+                boxShadow: '0 0 6px rgba(255, 255, 255, 0.8)',
+                animation: 'twinkle 2s infinite alternate'
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
