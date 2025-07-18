@@ -29,6 +29,8 @@ const IMAGE_PUZZLES = [
 // Contract configuration for Base
 const CONTRACT_CONFIG = {
   address: process.env.REACT_APP_CONTRACT_ADDRESS || '0x1234567890123456789012345678901234567890',
+  rpcUrl: process.env.REACT_APP_BASE_RPC_URL || 'https://mainnet.base.org',
+  chainId: parseInt(process.env.REACT_APP_BASE_CHAIN_ID || '8453'),
   abi: [
     {
       "inputs": [
@@ -66,6 +68,20 @@ const CONTRACT_CONFIG = {
     {
       "inputs": [],
       "name": "getTotalScores",
+      "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{"internalType": "address", "name": "_player", "type": "address"}],
+      "name": "getPlayerBestTime",
+      "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{"internalType": "uint256", "name": "_fid", "type": "uint256"}],
+      "name": "getFidBestTime",
       "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
       "stateMutability": "view",
       "type": "function"
