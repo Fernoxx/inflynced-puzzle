@@ -86,12 +86,11 @@ const InflyncedPuzzle = () => {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
-  
-  // User & Web3 state
-  const [currentUser, setCurrentUser] = useState(null);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState(null);
-  const [contract, setContract] = useState(null);
+  const [currentUser, setCurrentUser] = useState({ username: '@anonymous', fid: null, displayName: 'Anonymous', pfpUrl: null });
+  const [isMiniapp, setIsMiniapp] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [snowParticles, setSnowParticles] = useState([]);
+  const [showSnow, setShowSnow] = useState(false);
   
   // Leaderboard state
   const [leaderboard, setLeaderboard] = useState([]);
@@ -100,8 +99,67 @@ const InflyncedPuzzle = () => {
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
+  const snowIntervalRef = useRef(null);
 
-  // Initialize audio context
+  // Initialize Farcaster SDK and user context
+  useEffect(() => {
+    const initializeFarcaster = async () => {
+      try {
+        // Check if we're in a Farcaster miniapp environment
+        const isFarcasterMiniapp = window.location.hostname.includes('farcaster') || 
+                                   window.parent !== window || 
+                                   window.location.search.includes('farcaster');
+        
+        setIsMiniapp(isFarcasterMiniapp);
+
+        if (isFarcasterMiniapp) {
+          try {
+            // Import Farcaster SDK
+            const { sdk } = await import('@farcaster/miniapp-sdk');
+            
+            // Get user context from Farcaster
+            const context = await sdk.context;
+            
+            if (context?.user) {
+              setCurrentUser({
+                fid: context.user.fid,
+                username: context.user.username || `@user${context.user.fid}`,
+                displayName: context.user.displayName || context.user.username || 'Farcaster User',
+                pfpUrl: context.user.pfpUrl
+              });
+            }
+            
+            // Call ready() to hide loading screen
+            await sdk.actions.ready();
+            setIsReady(true);
+            console.log('Farcaster SDK initialized successfully');
+            
+          } catch (sdkError) {
+            console.warn('Farcaster SDK not available, using fallback:', sdkError);
+            // Fallback for development/testing
+            setCurrentUser({
+              fid: Math.floor(Math.random() * 100000) + 1000,
+              username: '@testuser',
+              displayName: 'Test User',
+              pfpUrl: null
+            });
+            setIsReady(true);
+          }
+                 } else {
+           // Not in miniapp, use local storage or prompt
+           getUserProfile();
+           setIsReady(true);
+         }
+       } catch (error) {
+         console.error('Failed to initialize Farcaster context:', error);
+         getUserProfile();
+         setIsReady(true);
+       }
+    };
+
+    initializeFarcaster();
+  }, []);
+
   useEffect(() => {
     try {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -109,6 +167,53 @@ const InflyncedPuzzle = () => {
       console.log('Audio not supported');
     }
   }, []);
+
+  // Snow animation effect
+  useEffect(() => {
+    if (showSnow) {
+      const createSnowflake = () => {
+        return {
+          id: Math.random(),
+          x: Math.random() * window.innerWidth,
+          y: -10,
+          size: Math.random() * 3 + 2,
+          speed: Math.random() * 2 + 1,
+          opacity: Math.random() * 0.6 + 0.4,
+          drift: Math.random() * 2 - 1
+        };
+      };
+
+      const updateSnowflakes = () => {
+        setSnowParticles(prev => {
+          const updated = prev.map(flake => ({
+            ...flake,
+            y: flake.y + flake.speed,
+            x: flake.x + flake.drift * 0.5
+          })).filter(flake => flake.y < window.innerHeight + 20);
+
+          // Add new snowflakes
+          while (updated.length < 50) {
+            updated.push(createSnowflake());
+          }
+
+          return updated;
+        });
+      };
+
+      snowIntervalRef.current = setInterval(updateSnowflakes, 50);
+      
+      return () => {
+        if (snowIntervalRef.current) {
+          clearInterval(snowIntervalRef.current);
+        }
+      };
+    } else {
+      setSnowParticles([]);
+      if (snowIntervalRef.current) {
+        clearInterval(snowIntervalRef.current);
+      }
+    }
+  }, [showSnow]);
 
   // Create new user
   const createNewUser = useCallback(() => {
