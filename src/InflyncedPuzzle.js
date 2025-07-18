@@ -262,28 +262,28 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewUser]);
 
-  // Automatic Farcaster wallet detection and connection
+  // Automatic Farcaster built-in wallet detection and connection
   const initializeFarcasterWallet = useCallback(async () => {
     if (!isMiniapp) return;
     
     try {
-      // Import Farcaster SDK and access wallet
+      // Import Farcaster SDK and access built-in wallet
       const { sdk } = await import('@farcaster/miniapp-sdk');
       
-      // Check if wallet is available
+      // Check if Farcaster's built-in wallet is available
       if (sdk.wallet?.ethereum) {
-        console.log('🔗 Farcaster wallet detected, connecting automatically...');
+        console.log('🔗 Farcaster built-in wallet detected, connecting automatically...');
         
-        // Get accounts from Farcaster wallet
+        // Get accounts from Farcaster's built-in wallet (not external wallets)
         const accounts = await sdk.wallet.ethereum.request({ 
-          method: 'eth_requestAccounts' 
+          method: 'eth_accounts' // Use eth_accounts instead of eth_requestAccounts to avoid external wallet popup
         });
         
         if (accounts && accounts.length > 0) {
           setWalletAddress(accounts[0]);
           setWalletConnected(true);
           
-          // Switch to Base network automatically
+          // Switch to Base network automatically using Farcaster's built-in wallet
           try {
             await sdk.wallet.ethereum.request({
               method: 'wallet_switchEthereumChain',
@@ -304,15 +304,28 @@ const InflyncedPuzzle = () => {
             }
           }
           
-          console.log('✅ Farcaster wallet connected automatically:', accounts[0]);
+          console.log('✅ Farcaster built-in wallet connected automatically:', accounts[0]);
           return true;
+        } else {
+          // If no accounts, try to request access to Farcaster's built-in wallet
+          console.log('🔑 Requesting access to Farcaster built-in wallet...');
+          const requestedAccounts = await sdk.wallet.ethereum.request({ 
+            method: 'eth_requestAccounts' 
+          });
+          
+          if (requestedAccounts && requestedAccounts.length > 0) {
+            setWalletAddress(requestedAccounts[0]);
+            setWalletConnected(true);
+            console.log('✅ Farcaster built-in wallet access granted:', requestedAccounts[0]);
+            return true;
+          }
         }
       } else {
-        console.log('⚠️ Farcaster wallet not available');
+        console.log('⚠️ Farcaster built-in wallet not available');
         return false;
       }
     } catch (error) {
-      console.error('❌ Failed to initialize Farcaster wallet:', error);
+      console.error('❌ Failed to initialize Farcaster built-in wallet:', error);
       return false;
     }
   }, [isMiniapp]);
@@ -326,7 +339,8 @@ const InflyncedPuzzle = () => {
         // Check if we're in a Farcaster miniapp environment
         const isFarcasterMiniapp = window.location.href.includes('farcaster') || 
                                   window.navigator.userAgent.includes('Farcaster') ||
-                                  window.parent !== window;
+                                  window.navigator.userAgent.includes('Warpcast') ||
+                                  (window.parent !== window && window.location.href.includes('vercel.app'));
         
         setIsMiniapp(isFarcasterMiniapp);
         
@@ -387,6 +401,13 @@ const InflyncedPuzzle = () => {
         } else {
           console.log('📱 Not in Farcaster miniapp, using fallback user system');
           createFallbackUser();
+          
+          // Show message to user that they should access through Farcaster
+          setTimeout(() => {
+            if (!isFarcasterMiniapp) {
+              alert('⚠️ For the best experience with onchain features, please access this app through Farcaster or Coinbase Wallet.');
+            }
+          }, 2000);
         }
         
         setGameState('menu');
@@ -510,7 +531,7 @@ const InflyncedPuzzle = () => {
       // If wallet is connected, submit to contract
       if (walletConnected && walletAddress && isMiniapp) {
         try {
-          // Use Farcaster SDK wallet for transactions
+          // Use Farcaster SDK built-in wallet for transactions
           const { sdk } = await import('@farcaster/miniapp-sdk');
           
           if (sdk.wallet?.ethereum) {
@@ -518,7 +539,7 @@ const InflyncedPuzzle = () => {
             const signer = provider.getSigner();
             const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
             
-            console.log('🔗 Submitting to contract via Farcaster wallet...');
+            console.log('🔗 Submitting to contract via Farcaster built-in wallet...');
             const tx = await contract.submitScore(
               fid,
               username,
@@ -535,7 +556,7 @@ const InflyncedPuzzle = () => {
             localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
             setLeaderboard(scores.slice(0, 10));
           } else {
-            throw new Error('Farcaster wallet not available');
+            throw new Error('Farcaster built-in wallet not available');
           }
           
         } catch (contractError) {
@@ -1092,18 +1113,18 @@ const InflyncedPuzzle = () => {
               {/* Wallet Status Display */}
               {isMiniapp && (
                 <div style={{ marginTop: '12px', padding: '8px', borderTop: '1px solid #f0f0f0' }}>
-                  {walletConnected ? (
-                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
-                      ✅ Base Wallet Connected
-                      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                        {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
-                      </div>
+                                  {walletConnected ? (
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
+                    ✅ Farcaster Wallet Connected
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                      {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
                     </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
-                      🔗 Wallet Auto-Detection Active
-                    </div>
-                  )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#666' }}>
+                    🔗 Farcaster Built-in Wallet Ready
+                  </div>
+                )}
                 </div>
               )}
             </div>
