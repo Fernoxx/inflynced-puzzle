@@ -5,13 +5,32 @@
     "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
   },
   "miniapp": {
-    "version": "1",
+    "version": "vNext",
     "name": "InflyncedPuzzle",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
-    "homeUrl": "https://inflyncedpuzzle.vercel.app",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png",
-    "buttonTitle": "🧩 Start Puzzle",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg",
-    "splashBackgroundColor": "#B8460E"
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
+    "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=3",
+    "buttonTitle": "🧩 Play Puzzle",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=3",
+    "splashBackgroundColor": "#B8460E",
+    "features": {
+      "wallet": {
+        "enabled": true,
+        "supportedChains": [8453, 1],
+        "defaultChain": 8453,
+        "preferredWallet": "farcaster"
+      },
+      "onchain": {
+        "enabled": true,
+        "leaderboard": true,
+        "scoring": true
+      }
+    },
+    "permissions": [
+      "wallet:read",
+      "wallet:connect",
+      "user:read",
+      "cast:compose"
+    ]
   }
 }
