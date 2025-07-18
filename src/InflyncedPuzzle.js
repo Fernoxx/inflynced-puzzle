@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Share2, Trophy, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
 
+
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
   { id: 1, image: "/images/puzzle1.jpg" },
@@ -102,6 +103,11 @@ const InflyncedPuzzle = () => {
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
   const [currentUser, setCurrentUser] = useState({ username: '@anonymous', fid: null, displayName: 'Anonymous', pfpUrl: null });
+  
+  // Wallet states
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
   const [isMiniapp, setIsMiniapp] = useState(false);
   const [snowParticles, setSnowParticles] = useState([]);
   const [showSnow, setShowSnow] = useState(false);
@@ -372,12 +378,83 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Submit score to contract (wallet-less)
+  // Connect wallet function for Farcaster miniapps
+  const connectWallet = useCallback(async () => {
+    setIsConnectingWallet(true);
+    
+    try {
+      // Check if we're in a Farcaster environment
+      if (window.ethereum) {
+        // Request account access
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
+        });
+        
+        if (accounts && accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          setWalletConnected(true);
+          
+          // Switch to Base network if needed
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x2105' }], // Base mainnet
+            });
+          } catch (switchError) {
+            // If the chain isn't added to MetaMask, add it
+            if (switchError.code === 4902) {
+              await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: '0x2105',
+                  chainName: 'Base',
+                  nativeCurrency: {
+                    name: 'ETH',
+                    symbol: 'ETH',
+                    decimals: 18,
+                  },
+                  rpcUrls: ['https://mainnet.base.org'],
+                  blockExplorerUrls: ['https://basescan.org/'],
+                }],
+              });
+            }
+          }
+          
+          console.log('✅ Wallet connected:', accounts[0]);
+          return true;
+        }
+      } else {
+        // Fallback for Farcaster miniapps - try Coinbase Wallet
+        if (window.coinbaseWalletExtension) {
+          const accounts = await window.coinbaseWalletExtension.request({ 
+            method: 'eth_requestAccounts' 
+          });
+          
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+            setWalletConnected(true);
+            console.log('✅ Coinbase Wallet connected:', accounts[0]);
+            return true;
+          }
+        } else {
+          alert('⚠️ No wallet detected. Please install MetaMask or Coinbase Wallet to submit scores onchain.');
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to connect wallet:', error);
+      alert('Failed to connect wallet. Please try again.');
+      return false;
+    } finally {
+      setIsConnectingWallet(false);
+    }
+  }, []);
+
+  // Submit score to contract (with wallet integration)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
     setIsSubmittingScore(true);
     
     try {
-      // Show instructions to user for onchain submission
       const timeInSeconds = (time / 1000).toFixed(1);
       const contractAddress = CONTRACT_CONFIG.address;
       
@@ -388,44 +465,65 @@ const InflyncedPuzzle = () => {
         puzzleId 
       });
       
-      // Create submission instructions
-      const submissionData = {
-        contractAddress,
-        functionName: 'submitScore',
-        parameters: [fid, username, Math.round(time), puzzleId],
-        network: 'Base Sepolia',
-        explorerUrl: `https://sepolia.basescan.org/address/${contractAddress}`
-      };
-      
-      console.log('🔗 Onchain submission data:', submissionData);
-      
-      // For now, save to localStorage as backup
+      // Save to localStorage first
       const stored = localStorage.getItem('inflynced-leaderboard');
       const scores = stored ? JSON.parse(stored) : [];
-      scores.push({
+      const newScore = {
         fid: fid.toString(),
         username,
         displayName: currentUser?.displayName || username,
         time: timeInSeconds,
         timestamp: Date.now(),
         puzzleId,
-        onchainPending: true
-      });
+        onchainPending: !walletConnected
+      };
+      scores.push(newScore);
       scores.sort((a, b) => parseFloat(a.time) - parseFloat(b.time));
       localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
       setLeaderboard(scores.slice(0, 10));
       
-      // Show user the submission instructions
-      alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain:\n1. Connect wallet to Base network\n2. Call submitScore(${fid}, "${username}", ${Math.round(time)}, ${puzzleId})\n3. Contract: ${contractAddress}`);
+      // If wallet is connected, submit to contract
+      if (walletConnected && walletAddress) {
+        try {
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          const signer = provider.getSigner();
+          const contract = new ethers.Contract(contractAddress, CONTRACT_CONFIG.abi, signer);
+          
+          console.log('🔗 Submitting to contract...');
+          const tx = await contract.submitScore(
+            fid,
+            username,
+            Math.round(time),
+            puzzleId
+          );
+          
+          console.log('⏳ Transaction sent:', tx.hash);
+          alert(`🎉 Score submitted onchain!\n\nTime: ${timeInSeconds}s\nTransaction: ${tx.hash}\n\nView on BaseScan: https://basescan.org/tx/${tx.hash}`);
+          
+          // Update the score to mark as onchain
+          newScore.onchainPending = false;
+          newScore.txHash = tx.hash;
+          localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
+          setLeaderboard(scores.slice(0, 10));
+          
+        } catch (contractError) {
+          console.error('❌ Contract submission failed:', contractError);
+          alert(`Score saved locally!\n\nTime: ${timeInSeconds}s\n\n⚠️ Onchain submission failed: ${contractError.message}\n\nTry connecting your wallet and ensure you have Base ETH for gas fees.`);
+        }
+      } else {
+        // Wallet not connected - show connection prompt
+        alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain, tap "Connect Base Wallet" and ensure you have Base ETH for gas fees.`);
+      }
       
       return true;
     } catch (error) {
-      console.log('❌ Failed to prepare score submission:', error);
+      console.log('❌ Failed to submit score:', error);
+      alert(`Failed to submit score: ${error.message}`);
       return false;
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [currentUser]);
+  }, [currentUser, walletConnected, walletAddress]);
 
   // Load leaderboard on component mount
   useEffect(() => {
@@ -954,6 +1052,37 @@ const InflyncedPuzzle = () => {
                   🏆 No scores yet! Be the first!
                 </div>
               )}
+              
+              {/* Wallet Connection Button */}
+              <div style={{ marginTop: '12px', padding: '8px', borderTop: '1px solid #f0f0f0' }}>
+                {walletConnected ? (
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: '#4caf50' }}>
+                    ✅ Base Wallet Connected
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                      {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={connectWallet}
+                    disabled={isConnectingWallet}
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      fontWeight: '600',
+                      fontSize: '12px',
+                      border: 'none',
+                      cursor: isConnectingWallet ? 'not-allowed' : 'pointer',
+                      opacity: isConnectingWallet ? 0.7 : 1
+                    }}
+                  >
+                    {isConnectingWallet ? '🔄 Connecting...' : '🔗 Connect Base Wallet'}
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
