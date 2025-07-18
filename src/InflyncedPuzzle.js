@@ -263,32 +263,72 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewUser]);
 
-  // Initialize user system
+  // Initialize Farcaster miniapp and user system
   useEffect(() => {
-    const initializeUser = async () => {
+    const initializeFarcasterUser = async () => {
       try {
-        console.log('🔄 Initializing user system...');
+        console.log('🔄 Initializing Farcaster user system...');
         
-        // Check if we're in Farcaster (simple detection)
-        const urlParams = new URLSearchParams(window.location.search);
-        const farcasterUsername = urlParams.get('username');
-        const farcasterFid = urlParams.get('fid');
+        // Check if we're in a Farcaster miniapp environment
+        const isFarcasterMiniapp = window.location.href.includes('farcaster') || 
+                                  window.navigator.userAgent.includes('Farcaster') ||
+                                  window.parent !== window;
         
-        if (farcasterUsername && farcasterFid) {
-          // Use Farcaster URL parameters if available
-          const farcasterUser = {
-            fid: parseInt(farcasterFid),
-            username: farcasterUsername,
-            displayName: farcasterUsername,
-            pfpUrl: null,
-            isFromFarcaster: true
-          };
-          
-          console.log('✅ Farcaster user detected from URL:', farcasterUser);
-          setCurrentUser(farcasterUser);
+        setIsMiniapp(isFarcasterMiniapp);
+        
+        if (isFarcasterMiniapp) {
+          try {
+            // Import Farcaster SDK dynamically
+            const { sdk } = await import('@farcaster/miniapp-sdk');
+            
+            // Get user context from Farcaster
+            const context = await sdk.context;
+            
+            if (context?.user) {
+              // Extract real user data from Farcaster
+              const farcasterUser = {
+                fid: context.user.fid,
+                username: context.user.username,
+                displayName: context.user.displayName || context.user.username,
+                pfpUrl: context.user.pfpUrl,
+                isFromFarcaster: true
+              };
+              
+              console.log('✅ Real Farcaster user loaded:', farcasterUser);
+              setCurrentUser(farcasterUser);
+              
+              // Call ready to hide loading screen
+              await sdk.actions.ready();
+              console.log('✅ Farcaster miniapp ready');
+            } else {
+              console.log('⚠️ No user context available');
+              createFallbackUser();
+            }
+          } catch (sdkError) {
+            console.log('❌ Farcaster SDK error:', sdkError);
+            console.log('📱 Falling back to URL parameters or default user');
+            
+            // Try URL parameters as fallback
+            const urlParams = new URLSearchParams(window.location.search);
+            const farcasterUsername = urlParams.get('username');
+            const farcasterFid = urlParams.get('fid');
+            
+            if (farcasterUsername && farcasterFid) {
+              const urlUser = {
+                fid: parseInt(farcasterFid),
+                username: farcasterUsername,
+                displayName: farcasterUsername,
+                pfpUrl: null,
+                isFromFarcaster: true
+              };
+              console.log('✅ Using URL parameters:', urlUser);
+              setCurrentUser(urlUser);
+            } else {
+              createFallbackUser();
+            }
+          }
         } else {
-          // Use fallback system
-          console.log('📱 Using fallback user system');
+          console.log('📱 Not in Farcaster miniapp, using fallback user system');
           createFallbackUser();
         }
         
@@ -302,7 +342,7 @@ const InflyncedPuzzle = () => {
     };
 
     // Small delay to show loading screen
-    setTimeout(initializeUser, 1000);
+    setTimeout(initializeFarcasterUser, 1000);
   }, [createFallbackUser]);
 
   // Test contract connection on load
@@ -378,77 +418,63 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Connect wallet function for Farcaster miniapps
-  const connectWallet = useCallback(async () => {
+  // Farcaster miniapp wallet integration
+  const connectFarcasterWallet = useCallback(async () => {
     setIsConnectingWallet(true);
     
     try {
-      // Check if we're in a Farcaster environment
-      if (window.ethereum) {
-        // Request account access
-        const accounts = await window.ethereum.request({ 
-          method: 'eth_requestAccounts' 
-        });
-        
-        if (accounts && accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-          setWalletConnected(true);
-          
-          // Switch to Base network if needed
-          try {
-            await window.ethereum.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x2105' }], // Base mainnet
-            });
-          } catch (switchError) {
-            // If the chain isn't added to MetaMask, add it
-            if (switchError.code === 4902) {
-              await window.ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [{
-                  chainId: '0x2105',
-                  chainName: 'Base',
-                  nativeCurrency: {
-                    name: 'ETH',
-                    symbol: 'ETH',
-                    decimals: 18,
-                  },
-                  rpcUrls: ['https://mainnet.base.org'],
-                  blockExplorerUrls: ['https://basescan.org/'],
-                }],
-              });
-            }
-          }
-          
-          console.log('✅ Wallet connected:', accounts[0]);
-          return true;
-        }
-      } else {
-        // Fallback for Farcaster miniapps - try Coinbase Wallet
-        if (window.coinbaseWalletExtension) {
-          const accounts = await window.coinbaseWalletExtension.request({ 
+      // Check if we're in a Farcaster miniapp environment
+      if (isMiniapp) {
+        // Use Farcaster's built-in wallet
+        if (window.ethereum) {
+          const accounts = await window.ethereum.request({ 
             method: 'eth_requestAccounts' 
           });
           
           if (accounts && accounts.length > 0) {
             setWalletAddress(accounts[0]);
             setWalletConnected(true);
-            console.log('✅ Coinbase Wallet connected:', accounts[0]);
+            
+            // Switch to Base network
+            try {
+              await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x2105' }], // Base mainnet
+              });
+            } catch (switchError) {
+              if (switchError.code === 4902) {
+                await window.ethereum.request({
+                  method: 'wallet_addEthereumChain',
+                  params: [{
+                    chainId: '0x2105',
+                    chainName: 'Base',
+                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                    rpcUrls: ['https://mainnet.base.org'],
+                    blockExplorerUrls: ['https://basescan.org/'],
+                  }],
+                });
+              }
+            }
+            
+            console.log('✅ Farcaster wallet connected:', accounts[0]);
             return true;
           }
         } else {
-          alert('⚠️ No wallet detected. Please install MetaMask or Coinbase Wallet to submit scores onchain.');
+          alert('⚠️ Wallet not available in this Farcaster client. Please use Warpcast or a compatible client.');
           return false;
         }
+      } else {
+        alert('⚠️ This feature only works in Farcaster miniapps. Please access this app through Farcaster.');
+        return false;
       }
     } catch (error) {
-      console.error('❌ Failed to connect wallet:', error);
+      console.error('❌ Failed to connect Farcaster wallet:', error);
       alert('Failed to connect wallet. Please try again.');
       return false;
     } finally {
       setIsConnectingWallet(false);
     }
-  }, []);
+  }, [isMiniapp]);
 
   // Submit score to contract (with wallet integration)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
@@ -1064,7 +1090,7 @@ const InflyncedPuzzle = () => {
                   </div>
                 ) : (
                   <button
-                    onClick={connectWallet}
+                    onClick={connectFarcasterWallet}
                     disabled={isConnectingWallet}
                     style={{
                       width: '100%',
