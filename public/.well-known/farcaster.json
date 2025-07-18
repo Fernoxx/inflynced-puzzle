@@ -1,0 +1,17 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjI0MjU5NywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDc1OUUxOWQ3MDQzNTdmZkMwODAxNTg5RDc3OTg1M2JkZWVkODkwNTMifQ",
+    "payload": "eyJkb21haW4iOiJpbmZseW5jZWRwdXp6bGUudmVyY2VsLmFwcCJ9",
+    "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "InflyncedPuzzle",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png",
+    "homeUrl": "https://inflyncedpuzzle.vercel.app",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png",
+    "buttonTitle": "🧩 Start Puzzle",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg",
+    "splashBackgroundColor": "#B8460E"
+  }
+}

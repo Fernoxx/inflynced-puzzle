@@ -1,5 +1,11 @@
+/**
+ * InflyncedPuzzle - A sliding puzzle game for Farcaster
+ * Features: Image-based puzzles, leaderboards, responsive design, keyboard controls
+ * Updated: Fixed layout and styling issues for proper deployment
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Share2, Trophy, Palette } from 'lucide-react';
+import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -26,17 +32,19 @@ const InflyncedPuzzle = () => {
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
   const [startTime, setStartTime] = useState(null);
-  const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const [imageErrors, setImageErrors] = useState(new Set());
+  const [sdkInstance, setSdkInstance] = useState(null);
+  const [isInFarcaster, setIsInFarcaster] = useState(false);
+  const [initializationComplete, setInitializationComplete] = useState(false);
+  const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -49,36 +57,158 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  const loadLeaderboard = useCallback(async () => {
+  const createNewProfile = useCallback(() => {
+    const username = window.prompt('Enter your username:') || 'anonymous';
+    const fallbackProfile = { 
+      username, 
+      fid: Math.random().toString(36).substring(7) 
+    };
+    localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
+    setUserProfile(fallbackProfile);
+    console.log('👤 Created new profile:', fallbackProfile);
+  }, []);
+
+  const getFallbackUserProfile = useCallback(() => {
+    console.log('🔄 Getting fallback user profile...');
+    const stored = localStorage.getItem('inflynced-user-profile');
+    if (stored) {
+      try {
+        const profile = JSON.parse(stored);
+        setUserProfile(profile);
+        console.log('📱 Using stored profile:', profile);
+      } catch (e) {
+        console.log('❌ Error parsing stored profile:', e);
+        createNewProfile();
+      }
+    } else {
+      createNewProfile();
+    }
+  }, [createNewProfile]);
+
+  // Initialize SDK - works universally in Farcaster and Coinbase wallet
+  useEffect(() => {
+    const initializeMiniapp = async () => {
+      try {
+        console.log('🔄 Initializing miniapp...');
+        
+        // Try to initialize Farcaster SDK - it will work in both environments
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        setSdkInstance(sdk);
+        
+        // Check if we're inside Farcaster context
+        setIsInFarcaster(true);
+        
+        // Get user data from SDK
+        const context = sdk.context;
+        if (context?.user) {
+          const userProfile = {
+            fid: context.user.fid || Math.random().toString(36).substring(7),
+            username: context.user.username || 'anonymous',
+            displayName: context.user.displayName,
+            pfpUrl: context.user.pfpUrl
+          };
+          setUserProfile(userProfile);
+          console.log('✅ Farcaster user profile:', userProfile);
+        } else {
+          console.log('❌ No Farcaster user context found');
+          getFallbackUserProfile();
+        }
+        
+        setInitializationComplete(true);
+        console.log('✅ Miniapp initialized successfully!');
+      } catch (error) {
+        console.log('❌ Farcaster SDK initialization failed:', error);
+        setIsInFarcaster(false);
+        getFallbackUserProfile();
+        setInitializationComplete(true);
+      }
+    };
+
+    initializeMiniapp();
+  }, [getFallbackUserProfile]);
+
+  // Load shared leaderboard from API with better error handling
+  const loadSharedLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
+    
     try {
-      const response = await fetch('/api/leaderboard');
+      console.log('🔄 Loading leaderboard from API...');
+      const response = await fetch('/api/leaderboard', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        setLeaderboard(data);
-      } else {
-        const stored = localStorage.getItem('inflynced-leaderboard');
-        if (stored) {
-          setLeaderboard(JSON.parse(stored));
+        console.log('✅ Loaded leaderboard data:', data);
+        
+        if (Array.isArray(data)) {
+          setSharedLeaderboard(data);
+          console.log(`📊 Updated leaderboard with ${data.length} scores`);
+        } else {
+          console.warn('⚠️ API returned non-array data:', data);
+          setSharedLeaderboard([]);
         }
+      } else {
+        throw new Error(`API returned ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.log('Failed to load leaderboard:', error);
-      const stored = localStorage.getItem('inflynced-leaderboard');
-      if (stored) {
-        setLeaderboard(JSON.parse(stored));
+      console.error('❌ Failed to load leaderboard:', error);
+      
+      // Fallback to localStorage if API fails
+      try {
+        const stored = localStorage.getItem('inflynced-leaderboard');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const realScores = parsed.filter(entry => 
+              entry.username !== 'puzzlemaster' && 
+              entry.username !== 'speedsolver' && 
+              entry.username !== 'braingamer' &&
+              !entry.fid?.includes('demo') &&
+              !entry.fid?.includes('sample')
+            );
+            
+            const userBestScores = {};
+            realScores.forEach(entry => {
+              if (!userBestScores[entry.fid] || entry.time < userBestScores[entry.fid].time) {
+                userBestScores[entry.fid] = entry;
+              }
+            });
+            
+            const finalScores = Object.values(userBestScores)
+              .sort((a, b) => a.time - b.time)
+              .slice(0, 10);
+            
+            setSharedLeaderboard(finalScores);
+            console.log('📱 Loaded leaderboard from localStorage fallback:', finalScores.length);
+          }
+        }
+      } catch (e) {
+        console.error('❌ localStorage fallback also failed:', e);
+        setSharedLeaderboard([]);
       }
     }
+    
     setIsLoadingLeaderboard(false);
   }, []);
 
+  // Submit score to shared API with better error handling
   const submitScore = useCallback(async (time, username, fid) => {
-    const newEntry = {
-      username,
-      fid,
+    console.log('📊 Submitting score to API:', { time: (time/1000).toFixed(1), username, fid });
+    
+    if (!username || !fid) {
+      console.error('❌ Cannot submit score - missing username or fid');
+      return;
+    }
+
+    const scoreData = {
+      username: username,
+      fid: fid,
       time: parseFloat((time / 1000).toFixed(1)),
-      timestamp: Date.now(),
-      avatar: "🧩"
+      avatar: userProfile?.pfpUrl || "🧩"
     };
 
     try {
@@ -87,68 +217,80 @@ const InflyncedPuzzle = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newEntry),
+        body: JSON.stringify(scoreData),
       });
 
       if (response.ok) {
-        loadLeaderboard();
-      } else {
-        throw new Error('API submission failed');
-      }
-    } catch (error) {
-      console.log('Failed to submit to API, using localStorage:', error);
-      const stored = localStorage.getItem('inflynced-leaderboard');
-      const currentBoard = stored ? JSON.parse(stored) : [];
-      
-      const updatedBoard = [...currentBoard, newEntry]
-        .sort((a, b) => a.time - b.time)
-        .slice(0, 10);
-      
-      localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedBoard));
-      setLeaderboard(updatedBoard);
-    }
-  }, [loadLeaderboard]);
-
-  const getUserProfile = useCallback(async () => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      let username = urlParams.get('username');
-      let fid = urlParams.get('fid');
-      
-      if (!username) {
-        const stored = localStorage.getItem('inflynced-user-profile');
-        if (stored) {
-          const storedProfile = JSON.parse(stored);
-          username = storedProfile.username;
-          fid = storedProfile.fid;
+        const result = await response.json();
+        console.log('✅ Score submitted successfully:', result);
+        
+        // If the API returns updated leaderboard, use it
+        if (result.leaderboard && Array.isArray(result.leaderboard)) {
+          setSharedLeaderboard(result.leaderboard);
+        } else {
+          // Otherwise, reload the leaderboard
+          setTimeout(() => loadSharedLeaderboard(), 1000);
         }
+      } else {
+        throw new Error(`Submit failed: ${response.status} ${response.statusText}`);
       }
-      
-      if (!username) {
-        username = window.prompt('Enter your Farcaster username:') || 'anonymous';
-      }
-      
-      if (!fid) {
-        fid = Math.random().toString(36).substring(7);
-      }
-      
-      const profile = { username, fid };
-      localStorage.setItem('inflynced-user-profile', JSON.stringify(profile));
-      setUserProfile(profile);
     } catch (error) {
-      console.log('Failed to get user profile:', error);
-      const fallbackProfile = { 
-        username: 'anonymous', 
-        fid: Math.random().toString(36).substring(7) 
-      };
-      localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackProfile));
-      setUserProfile(fallbackProfile);
+      console.error('❌ API submission failed:', error);
+      
+      // Fallback to localStorage
+      try {
+        const stored = localStorage.getItem('inflynced-leaderboard');
+        let currentScores = [];
+        if (stored) {
+          currentScores = JSON.parse(stored);
+        }
+        
+        // Remove existing user scores and demo data
+        currentScores = currentScores.filter(entry => 
+          entry.username !== 'puzzlemaster' && 
+          entry.username !== 'speedsolver' && 
+          entry.username !== 'braingamer' &&
+          !entry.fid?.includes('demo') &&
+          !entry.fid?.includes('sample') &&
+          entry.fid !== fid
+        );
+        
+        // Add new score
+        currentScores.push({
+          ...scoreData,
+          timestamp: Date.now(),
+          pfpUrl: userProfile?.pfpUrl
+        });
+        
+        // Sort and save
+        const updatedScores = currentScores
+          .sort((a, b) => a.time - b.time)
+          .slice(0, 10);
+        
+        localStorage.setItem('inflynced-leaderboard', JSON.stringify(updatedScores));
+        console.log('📱 Score saved to localStorage fallback');
+        
+        setSharedLeaderboard(updatedScores);
+      } catch (error) {
+        console.error('❌ localStorage fallback also failed:', error);
+      }
     }
-  }, []);
+  }, [userProfile, loadSharedLeaderboard]);
+
+  // Load leaderboard when component mounts
+  useEffect(() => {
+    if (initializationComplete) {
+      loadSharedLeaderboard();
+    }
+  }, [initializationComplete, loadSharedLeaderboard]);
 
   const changeUsername = useCallback(() => {
-    const newUsername = window.prompt('Enter your new Farcaster username:', userProfile?.username || '');
+    if (isInFarcaster) {
+      window.alert('Username is managed by Farcaster. Your current Farcaster username will be used.');
+      return;
+    }
+    
+    const newUsername = window.prompt('Enter your new username:', userProfile?.username || '');
     if (newUsername && newUsername.trim()) {
       const newProfile = { 
         username: newUsername.trim(), 
@@ -157,19 +299,7 @@ const InflyncedPuzzle = () => {
       localStorage.setItem('inflynced-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
     }
-  }, [userProfile]);
-
-  const clearUsername = useCallback(() => {
-    if (window.confirm('Are you sure you want to clear your stored username? You\'ll need to enter it again next time.')) {
-      localStorage.removeItem('inflynced-user-profile');
-      getUserProfile();
-    }
-  }, [getUserProfile]);
-
-  useEffect(() => {
-    loadLeaderboard();
-    getUserProfile();
-  }, [loadLeaderboard, getUserProfile]);
+  }, [userProfile, isInFarcaster]);
 
   const playSound = useCallback((frequency, duration = 0.1, type = 'sine') => {
     if (!audioContextRef.current) return;
@@ -195,30 +325,7 @@ const InflyncedPuzzle = () => {
   }, []);
 
   useEffect(() => {
-    const createParticle = () => ({
-      id: Math.random(),
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 3 + 1,
-      speed: Math.random() * 0.5 + 0.1,
-      opacity: Math.random() * 0.5 + 0.1,
-    });
-
-    setParticles(Array.from({ length: 15 }, createParticle));
-
-    const animateParticles = setInterval(() => {
-      setParticles(prev => prev.map(particle => ({
-        ...particle,
-        y: particle.y > 100 ? -5 : particle.y + particle.speed,
-        x: particle.x + Math.sin(particle.y * 0.01) * 0.1,
-      })));
-    }, 50);
-
-    return () => clearInterval(animateParticles);
-  }, []);
-
-  useEffect(() => {
-    if (gameState === 'playing' && startTime) {
+    if (gameState === 'playing' && startTime && !isPaused) {
       timerRef.current = setInterval(() => {
         setCurrentTime(Date.now() - startTime);
       }, 100);
@@ -227,7 +334,125 @@ const InflyncedPuzzle = () => {
     }
 
     return () => clearInterval(timerRef.current);
-  }, [gameState, startTime]);
+  }, [gameState, startTime, isPaused]);
+
+  const checkWin = useCallback((board) => {
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (i === 2 && j === 2) continue;
+        if (!board[i][j] || board[i][j].correctRow !== i || board[i][j].correctCol !== j) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }, []);
+
+  const calculateProgress = useCallback((board) => {
+    let correctTiles = 0;
+    const totalTiles = 8;
+    
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        if (i === 2 && j === 2) continue;
+        if (board[i][j] && board[i][j].correctRow === i && board[i][j].correctCol === j) {
+          correctTiles++;
+        }
+      }
+    }
+    
+    return (correctTiles / totalTiles) * 100;
+  }, []);
+
+  const makeMove = useCallback((row, col) => {
+    if (gameState !== 'playing' || isPaused) return;
+    
+    const dr = Math.abs(row - emptyPos.row);
+    const dc = Math.abs(col - emptyPos.col);
+    
+    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+      const newBoard = board.map(r => [...r]);
+      
+      newBoard[emptyPos.row][emptyPos.col] = board[row][col];
+      newBoard[row][col] = null;
+      
+      setBoard(newBoard);
+      setEmptyPos({ row, col });
+      
+      const newProgress = calculateProgress(newBoard);
+      setProgress(newProgress);
+      
+      // Play move sound with different tones based on progress
+      const frequency = 440 + (newProgress * 2); // Higher pitch as progress increases
+      playSound(frequency, 0.1);
+      
+      if (checkWin(newBoard)) {
+        // Victory sound sequence
+        playSound(660, 0.2);
+        setTimeout(() => playSound(880, 0.2), 100);
+        setTimeout(() => playSound(1100, 0.3), 200);
+        
+        const finalTime = Date.now() - startTime;
+        setTotalTime(finalTime);
+        setGameState('completed');
+        
+        if (userProfile && userProfile.username && userProfile.fid) {
+          console.log('🎯 Game won! Submitting score for user:', userProfile);
+          submitScore(finalTime, userProfile.username, userProfile.fid);
+        } else {
+          console.log('❌ Cannot submit score - missing user profile:', userProfile);
+        }
+      }
+    } else {
+      // Invalid move sound
+      playSound(200, 0.1, 'sawtooth');
+    }
+  }, [gameState, emptyPos, board, calculateProgress, playSound, checkWin, startTime, userProfile, submitScore, isPaused]);
+
+  // Keyboard navigation support
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (gameState !== 'playing') return;
+      
+      let targetRow = emptyPos.row;
+      let targetCol = emptyPos.col;
+      
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          if (emptyPos.row < 2) targetRow = emptyPos.row + 1;
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          if (emptyPos.row > 0) targetRow = emptyPos.row - 1;
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          if (emptyPos.col < 2) targetCol = emptyPos.col + 1;
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          if (emptyPos.col > 0) targetCol = emptyPos.col - 1;
+          break;
+        default:
+          return;
+      }
+      
+      if (targetRow !== emptyPos.row || targetCol !== emptyPos.col) {
+        e.preventDefault();
+        makeMove(targetRow, targetCol);
+      }
+    };
+    
+    if (gameState === 'playing') {
+      window.addEventListener('keydown', handleKeyPress);
+      return () => window.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [gameState, emptyPos, makeMove]);
 
   const generateBoard = useCallback((puzzleConfig) => {
     const image = puzzleConfig.image;
@@ -243,9 +468,10 @@ const InflyncedPuzzle = () => {
           board[i][j] = {
             value: tileIndex + 1,
             image: image,
-            row: i,
-            col: j,
-            correctPos: { row: i, col: j }
+            row: i, // Current position row
+            col: j, // Current position col
+            correctRow: i, // Correct position row
+            correctCol: j  // Correct position col
           };
           tileIndex++;
         }
@@ -258,7 +484,10 @@ const InflyncedPuzzle = () => {
     const newBoard = board.map(row => [...row]);
     let emptyRow = 2, emptyCol = 2;
     
-    for (let i = 0; i < 1000; i++) {
+    // Optimized shuffling - fewer moves but still random
+    const moves = 500 + Math.floor(Math.random() * 500); // 500-1000 moves
+    
+    for (let i = 0; i < moves; i++) {
       const directions = [];
       if (emptyRow > 0) directions.push({ dr: -1, dc: 0 });
       if (emptyRow < 2) directions.push({ dr: 1, dc: 0 });
@@ -278,34 +507,6 @@ const InflyncedPuzzle = () => {
     return { board: newBoard, emptyPos: { row: emptyRow, col: emptyCol } };
   }, []);
 
-  const checkWin = useCallback((board) => {
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue;
-        if (!board[i][j] || board[i][j].correctPos.row !== i || board[i][j].correctPos.col !== j) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }, []);
-
-  const calculateProgress = useCallback((board) => {
-    let correctTiles = 0;
-    const totalTiles = 8;
-    
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue;
-        if (board[i][j] && board[i][j].correctPos.row === i && board[i][j].correctPos.col === j) {
-          correctTiles++;
-        }
-      }
-    }
-    
-    return (correctTiles / totalTiles) * 100;
-  }, []);
-
   const startGame = useCallback(() => {
     const randomIndex = Math.floor(Math.random() * IMAGE_PUZZLES.length);
     const selectedPuzzle = IMAGE_PUZZLES[randomIndex];
@@ -323,313 +524,586 @@ const InflyncedPuzzle = () => {
     setGameState('playing');
   }, [generateBoard, shuffleBoard, calculateProgress]);
 
-  const makeMove = useCallback((row, col) => {
-    if (gameState !== 'playing') return;
+  const shareResult = useCallback(async () => {
+    const timeInSeconds = (totalTime / 1000).toFixed(1);
+    const appUrl = window.location.origin;
+    const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
-    const dr = Math.abs(row - emptyPos.row);
-    const dc = Math.abs(col - emptyPos.col);
-    
-    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
-      const newBoard = board.map(r => [...r]);
-      
-      newBoard[emptyPos.row][emptyPos.col] = board[row][col];
-      newBoard[row][col] = null;
-      
-      setBoard(newBoard);
-      setEmptyPos({ row, col });
-      
-      const newProgress = calculateProgress(newBoard);
-      setProgress(newProgress);
-      
-      playSound(440, 0.1);
-      
-      if (checkWin(newBoard)) {
-        playSound(660, 0.3);
+    // Use Farcaster composeCast if available, otherwise fallback
+    if (sdkInstance && isInFarcaster) {
+      try {
+        const result = await sdkInstance.actions.composeCast({
+          text: text,
+          embeds: [appUrl]
+        });
         
-        const finalTime = Date.now() - startTime;
-        setTotalTime(finalTime);
-        setEndTime(Date.now());
-        setGameState('completed');
-        
-        if (userProfile) {
-          submitScore(finalTime, userProfile.username, userProfile.fid);
+        if (result?.cast) {
+          console.log('✅ Cast shared successfully:', result.cast.hash);
+        } else {
+          console.log('Cast sharing was cancelled');
         }
-        
-        setTimeout(() => playSound(523, 0.2), 0);
-        setTimeout(() => playSound(659, 0.2), 200);
-        setTimeout(() => playSound(784, 0.4), 400);
+        return;
+      } catch (error) {
+        console.log('Failed to use Farcaster composeCast:', error);
       }
     }
-  }, [gameState, emptyPos, board, playSound, checkWin, calculateProgress, startTime, userProfile, submitScore]);
-
-  const shareResult = useCallback(() => {
-    const timeInSeconds = (totalTime / 1000).toFixed(1);
-    const text = `I solved the puzzle in ${timeInSeconds} seconds.\nCan you beat my time?`;
-    const url = "https://inflynced-puzzle.vercel.app";
     
+    // Fallback to Web Share API or clipboard
     if (navigator.share) {
-      navigator.share({
-        title: 'InflyncedPuzzle',
-        text: text,
-        url: url,
-      });
+      try {
+        await navigator.share({
+          title: 'InflyncedPuzzle - I solved it!',
+          text: text,
+          url: appUrl,
+        });
+      } catch (error) {
+        console.log('Web Share cancelled or failed:', error);
+      }
     } else {
-      navigator.clipboard.writeText(`${text}\n${url}`);
-      window.alert('Result copied to clipboard!');
+      // Clipboard fallback
+      try {
+        await navigator.clipboard.writeText(`${text}\n\n${appUrl}`);
+        window.alert('Result copied to clipboard!');
+      } catch (error) {
+        // Manual copy fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = `${text}\n\n${appUrl}`;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        window.alert('Result copied to clipboard!');
+      }
     }
-  }, [totalTime]);
+  }, [totalTime, sdkInstance, isInFarcaster]);
 
   const formatTime = (time) => {
     return (time / 1000).toFixed(1);
   };
 
-  const backgroundStyle = backgroundMode === 'solid' 
-    ? {
-        backgroundColor: '#B8460E',
-      }
-    : {
-        background: `linear-gradient(135deg, #E9520B 0%, #FF8A65 50%, #FFAB91 100%)`,
-      };
-
   const getTileStyle = (tile) => {
-    if (!tile) return {};
+    // Use fixed tile size for consistent layout
+    const tileSize = 96; // matches CSS
+    const totalSize = tileSize * 3; // 288px total
     
-    const tileSize = 100;
-    const backgroundX = -(tile.correctPos.col * tileSize);
-    const backgroundY = -(tile.correctPos.row * tileSize);
+    const backgroundX = -(tile.correctCol * tileSize);
+    const backgroundY = -(tile.correctRow * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '300px 300px',
+      backgroundSize: `${totalSize}px ${totalSize}px`,
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
-      backgroundRepeat: 'no-repeat'
+      backgroundRepeat: 'no-repeat',
+      imageRendering: 'high-quality',
+      willChange: 'transform', // Performance optimization for animations
+      transform: 'translateZ(0)', // Hardware acceleration
     };
   };
 
   const handleImageError = (imagePath) => {
+    console.warn('⚠️ Failed to load image:', imagePath);
     setImageErrors(prev => new Set([...prev, imagePath]));
+    
+    // If all images fail to load, show a helpful message
+    const totalImages = IMAGE_PUZZLES.length;
+    const failedImages = imageErrors.size + 1; // +1 for the current error
+    
+    if (failedImages > totalImages * 0.5) {
+      console.error('❌ Too many image loading failures. Check image paths.');
+    }
   };
 
+  // Error recovery for corrupted game state
+  useEffect(() => {
+    if (gameState === 'playing' && (!board || board.length === 0)) {
+      console.warn('⚠️ Corrupted game state detected, returning to menu');
+      setGameState('menu');
+    }
+  }, [gameState, board]);
+
+  // Prevent memory leaks on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  // Preload next puzzle image for better performance
+  useEffect(() => {
+    if (currentPuzzle && currentPuzzle.id < IMAGE_PUZZLES.length) {
+      const nextPuzzle = IMAGE_PUZZLES.find(p => p.id === currentPuzzle.id + 1);
+      if (nextPuzzle) {
+        const img = new Image();
+        img.src = nextPuzzle.image;
+      }
+    }
+  }, [currentPuzzle]);
+
   return (
-    <div 
-      className="min-h-screen transition-all duration-1000 relative overflow-hidden game-board"
-      style={backgroundStyle}
-    >
-      {particles.map(particle => (
-        <div
-          key={particle.id}
-          className="absolute rounded-full bg-white pointer-events-none"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            width: `${particle.size}px`,
-            height: `${particle.size}px`,
-            opacity: particle.opacity,
-          }}
-        />
-      ))}
-
-      <div className="relative z-10 container mx-auto px-4 py-6 max-w-md">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/logo.png" 
-              alt="InflyncedPuzzle Logo" 
-              className="w-8 h-8 rounded-lg"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <h1 className="text-2xl font-bold text-white">InflyncedPuzzle</h1>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-            >
-              <Trophy size={20} />
-            </button>
-            <button
-              onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-              className="p-2 bg-white/20 rounded-lg backdrop-blur-sm text-white hover:bg-white/30 transition-colors"
-              title={backgroundMode === 'solid' ? 'Switch to light gradient' : 'Switch to dark solid'}
-            >
-              <Palette size={20} />
-            </button>
-          </div>
-        </div>
-
-        {userProfile && (
-          <div className="mb-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
-              <span className="text-white/80 text-sm">Playing as:</span>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      {/* Compact Card Container */}
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px 12px 20px',
+          borderBottom: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h1 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              color: '#333', 
+              margin: 0
+            }}>
+              InflyncedPuzzle
+            </h1>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
-                onClick={changeUsername}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  clearUsername();
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
                 }}
-                className="text-white font-bold text-sm hover:text-orange-200 transition-colors underline"
-                title="Click to change username • Right-click to clear stored username"
+                title="Toggle Leaderboard"
               >
-                @{userProfile.username}
+                <Trophy size={16} />
+              </button>
+              <button
+                onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
+                style={{
+                  padding: '6px',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: '6px',
+                  color: '#666',
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+                title="Toggle Background"
+              >
+                <Palette size={16} />
               </button>
             </div>
           </div>
-        )}
 
-        {gameState === 'playing' && (
-          <div className="mb-4">
-            <div className="flex justify-between text-white text-sm mb-2">
-              <span>{progress.toFixed(1)}% Complete</span>
-              <span>{formatTime(currentTime)}s</span>
+          {userProfile && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px',
+                padding: '4px 8px',
+                border: '1px solid #e9ecef'
+              }}>
+                <span style={{ color: '#666', fontSize: '11px' }}>Playing as:</span>
+                <button
+                  onClick={changeUsername}
+                  style={{
+                    color: '#333',
+                    fontWeight: '500',
+                    fontSize: '11px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  @{userProfile.username}
+                </button>
+                {isInFarcaster && (
+                  <span style={{
+                    fontSize: '9px',
+                    backgroundColor: '#e8f5e8',
+                    color: '#4caf50',
+                    padding: '1px 4px',
+                    borderRadius: '3px',
+                    fontWeight: '500'
+                  }}>
+                    FC
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
+                FID: {userProfile.fid.toString().substring(0, 6)} | In FC: {isInFarcaster ? 'Yes' : 'No'}
+              </div>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
+          )}
+        </div>
+
+        {/* Progress Bar (when playing) */}
+        {gameState === 'playing' && (
+          <div style={{ padding: '12px 20px', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '12px' }}>
+              <span style={{ fontWeight: '500', color: '#333' }}>{progress.toFixed(1)}% Complete</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={() => setIsPaused(!isPaused)}
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isPaused ? '▶️ Resume' : '⏸️ Pause'}
+                </button>
+                <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#333', fontSize: '12px' }}>
+                  {formatTime(currentTime)}s
+                </span>
+              </div>
+            </div>
+            <div style={{
+              width: '100%',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '6px',
+              height: '6px',
+              overflow: 'hidden'
+            }}>
               <div 
-                className="bg-white rounded-full h-2 transition-all duration-300"
-                style={{ width: `${progress}%` }}
+                style={{
+                  background: 'linear-gradient(90deg, #ff7043, #ff5722)',
+                  borderRadius: '6px',
+                  height: '6px',
+                  transition: 'width 0.3s ease',
+                  width: `${progress}%`
+                }}
               />
             </div>
           </div>
         )}
 
-        {showLeaderboard && (
-          <div className="mb-6 bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-              <Trophy size={18} />
-              Leaderboard
-              <button
-                onClick={loadLeaderboard}
-                className="ml-auto text-sm bg-white/20 px-2 py-1 rounded hover:bg-white/30 transition-colors"
-              >
-                Refresh
-              </button>
-            </h3>
-            
-            {isLoadingLeaderboard ? (
-              <div className="text-center text-white/70 py-4">
-                Loading scores...
+        {/* Main Content Area */}
+        <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {showLeaderboard && (
+            <div style={{ 
+              marginBottom: '16px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '8px', 
+              padding: '12px',
+              border: '1px solid #e9ecef',
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
+                  🏆 Leaderboard ({sharedLeaderboard.length})
+                </h3>
+                <button
+                  onClick={loadSharedLeaderboard}
+                  disabled={isLoadingLeaderboard}
+                  style={{
+                    fontSize: '10px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '4px 6px',
+                    borderRadius: '4px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <RefreshCw size={10} />
+                </button>
               </div>
-            ) : leaderboard.length > 0 ? (
-              <div className="space-y-2">
-                {leaderboard.map((entry, index) => (
-                  <div key={`${entry.fid}-${entry.timestamp}`} className="flex items-center justify-between text-white/90 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 text-center font-bold">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
-                      </span>
-                      <span className="text-lg">{entry.avatar}</span>
-                      <button 
-                        className="hover:text-white transition-colors hover:underline"
-                        onClick={() => window.open(`https://warpcast.com/${entry.username}`, '_blank')}
-                        title={`View @${entry.username}'s profile`}
-                      >
-                        @{entry.username}
-                      </button>
-                    </div>
-                    <span className="font-mono">{entry.time}s</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-white/70 py-4">
-                No scores yet. Be the first to play!
-              </div>
-            )}
-          </div>
-        )}
-
-        {gameState === 'menu' && (
-          <div className="text-center text-white">
-            <div className="mb-8">
-              <div className="text-6xl mb-4">🧩</div>
-              <h2 className="text-xl mb-2">Image Sliding Puzzle</h2>
-              <p className="text-white/80 mb-6">
-                Solve an image puzzle as fast as you can!
-              </p>
-            </div>
-            <button
-              onClick={startGame}
-              className="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold text-lg hover:bg-white/90 transition-colors flex items-center gap-2 mx-auto"
-            >
-              <Play size={24} />
-              Start Game
-            </button>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div>
-            <div className="mb-4 text-center">
-              <h3 className="text-white font-bold">Puzzle {currentPuzzle?.id}</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-1 mb-4 mx-auto max-w-xs bg-white/20 p-2 rounded-lg">
-              {board.map((row, rowIndex) =>
-                row.map((tile, colIndex) => (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`aspect-square rounded-md overflow-hidden transition-all duration-200 ${
-                      tile 
-                        ? 'cursor-pointer hover:scale-105 active:scale-95 shadow-lg border-2 border-white/20' 
-                        : 'bg-black/30 border-2 border-dashed border-white/50'
-                    }`}
-                    style={tile ? getTileStyle(tile) : {}}
-                    onClick={() => makeMove(rowIndex, colIndex)}
-                  >
-                    {tile && !imageErrors.has(tile.image) && (
-                      <div className="w-full h-full relative">
-                        <span className="absolute top-1 left-1 text-white font-bold text-xs bg-black/70 px-1 rounded z-10">
-                          {tile.value}
+              
+              {sharedLeaderboard.length > 0 ? (
+                <div style={{ fontSize: '11px' }}>
+                  {sharedLeaderboard.slice(0, 5).map((entry, index) => (
+                    <div key={`${entry.fid}-${entry.timestamp || index}`} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 6px',
+                      backgroundColor: index < 3 ? '#fff3e0' : 'white',
+                      borderRadius: '4px',
+                      marginBottom: '2px',
+                      border: '1px solid #f0f0f0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px' }}>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
                         </span>
-                        <img 
-                          src={tile.image} 
-                          alt={`Puzzle piece ${tile.value}`}
-                          className="hidden"
-                          onError={() => handleImageError(tile.image)}
-                          onLoad={(e) => e.target.style.display = 'none'}
-                        />
+                        <span style={{ fontWeight: '500' }}>@{entry.username}</span>
                       </div>
-                    )}
-                    {tile && imageErrors.has(tile.image) && (
-                      <div className="w-full h-full flex items-center justify-center bg-orange-400">
-                        <span className="text-white font-bold text-lg">{tile.value}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#ff5722' }}>
+                        {entry.time}s
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666', fontSize: '12px' }}>
+                  🏆 No scores yet! Be the first!
+                </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {gameState === 'completed' && (
-          <div className="text-center text-white">
-            <div className="text-6xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
-            <p className="text-lg mb-6">
-              You solved the puzzle in <span className="font-bold">{formatTime(totalTime)}s</span>
-            </p>
-            
-            <div className="flex flex-col gap-3">
+          {gameState === 'menu' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🧩</div>
+                <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Image Sliding Puzzle</h2>
+                <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
+                  Solve an image puzzle as fast as you can!
+                </p>
+              </div>
               <button
-                onClick={shareResult}
-                className="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-white/90 transition-colors flex items-center gap-2 justify-center"
-              >
-                <Share2 size={20} />
-                Share Result
-              </button>
-              
-              <button
-                onClick={() => setGameState('menu')}
-                className="bg-white/20 text-white px-6 py-3 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors flex items-center gap-2 justify-center"
+                onClick={startGame}
+                style={{
+                  backgroundColor: '#ff5722',
+                  color: 'white',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  margin: '0 auto',
+                  boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                }}
               >
                 <Play size={20} />
-                Play Again
+                Start Game
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {gameState === 'playing' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#333', margin: '0 0 4px 0' }}>
+                  Puzzle {currentPuzzle?.id}
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <span style={{ color: '#666', fontSize: '11px' }}>Difficulty:</span>
+                  <div style={{ display: 'flex', gap: '1px' }}>
+                    {Array.from({ length: Math.min(3, Math.ceil(currentPuzzle?.id / 5)) }).map((_, i) => (
+                      <span key={i} style={{ color: '#ff5722', fontSize: '11px' }}>⭐</span>
+                    ))}
+                  </div>
+                </div>
+                <p style={{ color: '#666', fontSize: '10px', margin: 0 }}>Use arrow keys or WASD to play</p>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div 
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '4px',
+                    width: '240px',
+                    height: '240px',
+                    padding: '8px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef',
+                    position: 'relative'
+                  }}
+                >
+                  {board.map((row, rowIndex) =>
+                    row.map((tile, colIndex) => (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        style={{
+                          width: '74px',
+                          height: '74px',
+                          borderRadius: '4px',
+                          border: tile ? '1px solid #e0e0e0' : '1px dashed #ccc',
+                          backgroundColor: tile ? '#fff' : '#f0f0f0',
+                          cursor: tile ? 'pointer' : 'default',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          transition: 'all 0.15s ease',
+                          ...(tile ? getTileStyle(tile) : {}),
+                          ...(isPaused ? { pointerEvents: 'none', filter: 'blur(1px)' } : {})
+                        }}
+                        onClick={() => makeMove(rowIndex, colIndex)}
+                        onTouchStart={(e) => e.preventDefault()}
+                        onTouchEnd={() => makeMove(rowIndex, colIndex)}
+                        onMouseEnter={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1.05)';
+                            e.target.style.borderColor = '#ff5722';
+                            e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (tile) {
+                            e.target.style.transform = 'scale(1)';
+                            e.target.style.borderColor = '#e0e0e0';
+                            e.target.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {tile && !imageErrors.has(tile.image) && (
+                          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute',
+                              top: '2px',
+                              left: '2px',
+                              color: 'white',
+                              fontWeight: '600',
+                              fontSize: '10px',
+                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              zIndex: 10
+                            }}>
+                              {tile.value}
+                            </span>
+                            <img 
+                              src={tile.image} 
+                              alt={`Puzzle piece ${tile.value}`}
+                              style={{ display: 'none' }}
+                              onError={() => handleImageError(tile.image)}
+                              onLoad={(e) => e.target.style.display = 'none'}
+                            />
+                          </div>
+                        )}
+                        {tile && imageErrors.has(tile.image) && (
+                          <div style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#ff5722',
+                            color: 'white'
+                          }}>
+                            <span style={{ fontWeight: '600', fontSize: '14px' }}>{tile.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  
+                  {isPaused && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 20
+                    }}>
+                      <div style={{ textAlign: 'center', color: 'white' }}>
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏸️</div>
+                        <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Game Paused</div>
+                        <button
+                          onClick={() => setIsPaused(false)}
+                          style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            cursor: 'pointer',
+                            fontSize: '11px'
+                          }}
+                        >
+                          Resume Game
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {gameState === 'completed' && (
+            <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>Congratulations!</h2>
+              <p style={{ fontSize: '14px', marginBottom: '20px', color: '#666' }}>
+                You solved the puzzle in <span style={{ fontWeight: '600', color: '#ff5722' }}>{formatTime(totalTime)}s</span>
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={shareResult}
+                  style={{
+                    backgroundColor: '#ff5722',
+                    color: 'white',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(255, 87, 34, 0.3)'
+                  }}
+                >
+                  <Share2 size={18} />
+                  Share Result
+                </button>
+                
+                <button
+                  onClick={() => setGameState('menu')}
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#666',
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: '1px solid #e0e0e0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Play size={18} />
+                  Play Again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
