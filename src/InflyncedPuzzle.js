@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Share2, Trophy, Palette, RefreshCw, Wallet } from 'lucide-react';
+import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
 
 // Image-based puzzle configurations (15 puzzles)
@@ -96,10 +96,12 @@ const InflyncedPuzzle = () => {
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
   const [startTime, setStartTime] = useState(null);
+  const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
   const [currentUser, setCurrentUser] = useState({ username: '@anonymous', fid: null, displayName: 'Anonymous', pfpUrl: null });
@@ -163,12 +165,12 @@ const InflyncedPuzzle = () => {
           }
                  } else {
            // Not in miniapp, use local storage or prompt
-           getUserProfile();
+           createNewUser();
            setIsReady(true);
          }
        } catch (error) {
          console.error('Failed to initialize Farcaster context:', error);
-         getUserProfile();
+         createNewUser();
          setIsReady(true);
        }
     };
@@ -321,8 +323,8 @@ const InflyncedPuzzle = () => {
             try {
               const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
               if (accounts.length > 0) {
-                setWalletAddress(accounts[0]);
-                setWalletConnected(true);
+                // setWalletAddress(accounts[0]); // Removed wallet-related state
+                // setWalletConnected(true); // Removed wallet-related state
                 
                 // Initialize contract
                 const signer = provider.getSigner();
@@ -331,7 +333,7 @@ const InflyncedPuzzle = () => {
                   CONTRACT_CONFIG.abi,
                   signer
                 );
-                setContract(contractInstance);
+                // setContract(contractInstance); // Removed contract-related state
                 
                 console.log('✅ Contract initialized:', CONTRACT_CONFIG.address);
               }
@@ -362,8 +364,8 @@ const InflyncedPuzzle = () => {
 
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        setWalletConnected(true);
+        // setWalletAddress(accounts[0]); // Removed wallet-related state
+        // setWalletConnected(true); // Removed wallet-related state
         
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
@@ -372,7 +374,7 @@ const InflyncedPuzzle = () => {
           CONTRACT_CONFIG.abi,
           signer
         );
-        setContract(contractInstance);
+        // setContract(contractInstance); // Removed contract-related state
         
         console.log('✅ Wallet connected:', accounts[0]);
       }
@@ -386,8 +388,17 @@ const InflyncedPuzzle = () => {
     setIsLoadingLeaderboard(true);
     
     try {
-      if (contract) {
+      if (CONTRACT_CONFIG.address !== '0x1234567890123456789012345678901234567890') {
         console.log('📊 Loading leaderboard from contract...');
+        
+        // Create read-only provider and contract
+        const provider = new ethers.providers.JsonRpcProvider(CONTRACT_CONFIG.rpcUrl);
+        const contract = new ethers.Contract(
+          CONTRACT_CONFIG.address,
+          CONTRACT_CONFIG.abi,
+          provider
+        );
+        
         const topScores = await contract.getTopScores(10);
         
         const formattedScores = topScores.map(score => ({
@@ -402,7 +413,7 @@ const InflyncedPuzzle = () => {
         setLeaderboard(formattedScores);
         console.log('✅ Leaderboard loaded:', formattedScores.length, 'scores');
       } else {
-        console.log('❌ Contract not initialized');
+        console.log('⚠️ Contract address not configured, using localStorage');
         const stored = localStorage.getItem('inflynced-leaderboard');
         if (stored) {
           const parsed = JSON.parse(stored);
@@ -419,7 +430,7 @@ const InflyncedPuzzle = () => {
     } finally {
       setIsLoadingLeaderboard(false);
     }
-  }, [contract]);
+  }, []);
 
   // Submit score to contract (wallet-less)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
@@ -860,23 +871,7 @@ const InflyncedPuzzle = () => {
               >
                 <Trophy size={16} />
               </button>
-              {!walletConnected && (
-                <button
-                  onClick={connectWallet}
-                  style={{
-                    padding: '6px',
-                    backgroundColor: '#ff5722',
-                    borderRadius: '6px',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                  title="Connect Wallet for Onchain Leaderboard"
-                >
-                  <Wallet size={16} />
-                </button>
-              )}
+              {/* Removed wallet connection button */}
               <button
                 onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
                 style={{
@@ -935,7 +930,7 @@ const InflyncedPuzzle = () => {
               </div>
               <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
                 FID: {currentUser.fid} | Type: {currentUser.isFromFarcaster ? 'Farcaster' : 'Local'}
-                {walletConnected && <span> | Wallet: ✅</span>}
+                {/* Removed wallet connected indicator */}
               </div>
             </div>
           )}
@@ -985,7 +980,7 @@ const InflyncedPuzzle = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: 0 }}>
-                  🏆 {walletConnected ? 'Onchain' : 'Local'} Leaderboard ({leaderboard.length})
+                  🏆 {leaderboard.length} Scores
                 </h3>
                 <button
                   onClick={loadLeaderboard}
@@ -1022,9 +1017,7 @@ const InflyncedPuzzle = () => {
                           {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
                         </span>
                         <span style={{ fontWeight: '500' }}>@{entry.username}</span>
-                        {walletConnected && (
-                          <span style={{ fontSize: '8px', color: '#4caf50' }}>⛓️</span>
-                        )}
+                        {/* Removed wallet connected indicator */}
                       </div>
                       <span style={{ fontFamily: 'monospace', fontWeight: '600', color: '#ff5722' }}>
                         {entry.time}s
@@ -1048,11 +1041,7 @@ const InflyncedPuzzle = () => {
                 <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>
                   Solve an image puzzle as fast as you can!
                 </p>
-                {!walletConnected && (
-                  <p style={{ color: '#ff5722', fontSize: '12px', marginTop: '8px' }}>
-                    Connect your wallet for onchain leaderboard!
-                  </p>
-                )}
+                {/* Removed wallet connection message */}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                 <button
