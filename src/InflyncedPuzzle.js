@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
+import { Play, Share2, Trophy, RefreshCw } from 'lucide-react';
 import { ethers } from 'ethers';
 
 // Image-based puzzle configurations (15 puzzles)
@@ -98,7 +98,6 @@ const InflyncedPuzzle = () => {
   const [startTime, setStartTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
