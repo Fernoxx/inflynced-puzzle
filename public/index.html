@@ -5,25 +5,179 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#B8460E" />
-    <meta name="description" content="InflyncedPuzzle - Fast-paced sliding puzzle challenge on Farcaster" />
+    <meta name="description" content="InflyncedPuzzle - Fast-paced sliding puzzle challenge on Farcaster with onchain leaderboard" />
     
-    <!-- Simple Farcaster Frame Meta Tag - Using existing image -->
-    <meta name="fc:frame" content='{"version":"1","imageUrl":"https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg","button":{"title":"🧩 Start Puzzle","action":{"type":"launch_frame","name":"InflyncedPuzzle","url":"https://inflyncedpuzzle.vercel.app","splashImageUrl":"https://inflyncedpuzzle.vercel.app/images/puzzle1.jpg","splashBackgroundColor":"#B8460E"}}}' />
+    <!-- Updated Farcaster Miniapp Meta Tag with Wallet Support -->
+    <meta name="fc:miniapp" content='{
+      "version": "vNext",
+      "name": "InflyncedPuzzle",
+      "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
+      "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
+      "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=3",
+      "buttonTitle": "🧩 Play Puzzle",
+      "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=3",
+      "splashBackgroundColor": "#B8460E",
+      "features": {
+        "wallet": {
+          "enabled": true,
+          "supportedChains": [8453, 1],
+          "defaultChain": 8453,
+          "preferredWallet": "farcaster"
+        },
+        "onchain": {
+          "enabled": true,
+          "leaderboard": true,
+          "scoring": true
+        }
+      },
+      "permissions": [
+        "wallet:read",
+        "wallet:connect",
+        "user:read",
+        "cast:compose"
+      ]
+    }' />
+    
+    <!-- Standard Farcaster Frame Meta Tags -->
+    <meta name="fc:frame" content="vNext" />
+    <meta name="fc:frame:image" content="https://inflyncedpuzzle.vercel.app/og-image.png?v=3" />
+    <meta name="fc:frame:button:1" content="🧩 Play Puzzle" />
+    <meta name="fc:frame:button:1:action" content="launch_frame" />
+    <meta name="fc:frame:button:1:target" content="https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle" />
+    
+    <!-- Wallet and Miniapp Feature Flags -->
+    <meta name="fc:frame:wallet:enabled" content="true" />
+    <meta name="fc:frame:wallet:chains" content="8453,1" />
+    <meta name="fc:frame:wallet:default_chain" content="8453" />
+    <meta name="fc:frame:onchain:enabled" content="true" />
+    
+    <!-- Mobile Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="InflyncedPuzzle" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Wallet App Support -->
+    <meta name="wallet-app-compatible" content="yes" />
+    <meta name="farcaster-miniapp" content="true" />
+    <meta name="farcaster-miniapp-version" content="vNext" />
+    <meta name="farcaster-miniapp-wallet" content="enabled" />
+    
+    <!-- Enhanced Web3 Support -->
+    <meta name="web3-enabled" content="true" />
+    <meta name="ethereum-provider" content="injected" />
+    <meta name="supported-chains" content="8453,1" />
+    <meta name="default-chain" content="8453" />
     
     <!-- Open Graph -->
-    <meta property="og:title" content="InflyncedPuzzle" />
-    <meta property="og:description" content="Fast-paced sliding puzzle challenge on Farcaster" />
-    <meta property="og:image" content="https://inflyncedpuzzle.vercel.app/og-image.png" />
-    <meta property="og:url" content="https://inflyncedpuzzle.vercel.app" />
+    <meta property="og:title" content="InflyncedPuzzle - Onchain Leaderboard" />
+    <meta property="og:description" content="Fast-paced sliding puzzle challenge on Farcaster with onchain leaderboard scoring" />
+    <meta property="og:image" content="https://inflyncedpuzzle.vercel.app/og-image.png?v=3" />
+    <meta property="og:url" content="https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="InflyncedPuzzle" />
     
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InflyncedPuzzle - Onchain Leaderboard" />
+    <meta name="twitter:description" content="Fast-paced sliding puzzle challenge on Farcaster with onchain leaderboard scoring" />
+    <meta name="twitter:image" content="https://inflyncedpuzzle.vercel.app/og-image.png?v=3" />
+    
+    <!-- Farcaster Specific -->
+    <meta name="fc:frame:post_url" content="https://inflyncedpuzzle.vercel.app/api/webhook" />
+    <meta name="fc:frame:input:text" content="Play the puzzle!" />
+    
+    <!-- Progressive Web App -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     
-    <title>InflyncedPuzzle - Farcaster Miniapp</title>
+    <!-- Preload Critical Resources -->
+    <link rel="preload" href="%PUBLIC_URL%/icon.png" as="image" />
+    <link rel="preload" href="%PUBLIC_URL%/og-image.png" as="image" />
+    
+    <!-- DNS Prefetch for API Calls -->
+    <link rel="dns-prefetch" href="//api.warpcast.com" />
+    <link rel="dns-prefetch" href="//farcaster.xyz" />
+    
+    <title>InflyncedPuzzle - Farcaster Miniapp with Onchain Leaderboard</title>
+    
+    <!-- Inline Critical CSS for Faster Loading -->
+    <style>
+      /* Critical loading styles */
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: linear-gradient(135deg, #ff7043 0%, #ff5722 100%);
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+      
+      /* Loading spinner animation */
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* Preload spinner */
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #ff5722;
+        border-top: 4px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+      
+      /* Wallet connection animations */
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+      }
+      
+      .wallet-connecting {
+        animation: pulse 2s infinite;
+      }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <noscript>
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; color: white; padding: 20px;">
+        <div>
+          <h1>🧩 InflyncedPuzzle</h1>
+          <p>You need to enable JavaScript to run this Farcaster miniapp.</p>
+          <p>Please enable JavaScript in your browser settings and refresh the page.</p>
+        </div>
+      </div>
+    </noscript>
+    <div id="root">
+      <!-- Fallback loading content -->
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; color: white;">
+        <div>
+          <div class="loading-spinner"></div>
+          <h2 style="margin-top: 20px;">Loading InflyncedPuzzle...</h2>
+          <p>Initializing Farcaster miniapp & wallet connection</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Preload key scripts -->
+    <script>
+      // Preload wallet detection
+      if (typeof window !== 'undefined') {
+        // Detect wallet early
+        window.walletDetected = {
+          ethereum: typeof window.ethereum !== 'undefined',
+          farcaster: typeof window.farcaster !== 'undefined',
+          userAgent: navigator.userAgent
+        };
+        
+        // Log wallet detection for debugging
+        console.log('🔍 Early wallet detection:', window.walletDetected);
+      }
+    </script>
   </body>
 </html>
