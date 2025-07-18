@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Share2, Trophy, Palette, RefreshCw } from 'lucide-react';
+import { Play, Trophy, RefreshCw } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -35,19 +35,13 @@ const InflyncedPuzzle = () => {
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [userProfile, setUserProfile] = useState(null);
-  const [imageErrors, setImageErrors] = useState(new Set());
-  const [sdkInstance, setSdkInstance] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
-  const [initializationComplete, setInitializationComplete] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSnowEffect, setShowSnowEffect] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -97,7 +91,6 @@ const InflyncedPuzzle = () => {
         
         // Import and initialize Farcaster SDK
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        setSdkInstance(sdk);
         
         // Wait for SDK to be ready and get user context
         const context = await sdk.context;
@@ -111,7 +104,6 @@ const InflyncedPuzzle = () => {
             displayName: context.user.displayName, // Real display name
             pfpUrl: context.user.pfpUrl      // Profile picture
           };
-          setCurrentUser(userProfile);
           setUserProfile(userProfile);
           setIsInFarcaster(true);
           console.log('✅ Real Farcaster user profile:', userProfile);
@@ -125,7 +117,6 @@ const InflyncedPuzzle = () => {
         await sdk.actions.ready();
         console.log('✅ SDK ready() called - loading screen hidden');
         
-        setInitializationComplete(true);
         setIsLoading(false);
         console.log('✅ Miniapp initialized successfully!');
         
@@ -133,7 +124,6 @@ const InflyncedPuzzle = () => {
         console.log('❌ Farcaster SDK initialization failed:', error);
         setIsInFarcaster(false);
         getFallbackUserProfile();
-        setInitializationComplete(true);
         setIsLoading(false);
       }
     };
@@ -250,12 +240,6 @@ const InflyncedPuzzle = () => {
 
   // Generate 3x3 board with proper image positioning
   const generateBoard = useCallback((puzzle) => {
-    const positions = [
-      { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
-      { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 },
-      { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }
-    ];
-
     // Create solved board first
     const solved = [];
     for (let row = 0; row < 3; row++) {
@@ -406,7 +390,6 @@ const InflyncedPuzzle = () => {
     setCurrentTime(0);
     setTotalTime(0);
     setGameState('playing');
-    setProgress(0);
     setShowLeaderboard(false);
   }, [generateBoard]);
 
@@ -417,7 +400,6 @@ const InflyncedPuzzle = () => {
     setStartTime(null);
     setCurrentTime(0);
     setTotalTime(0);
-    setProgress(0);
     setShowLeaderboard(false);
   }, []);
 
