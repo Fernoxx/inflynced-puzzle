@@ -405,59 +405,60 @@ const InflyncedPuzzle = () => {
     }
   }, [contract]);
 
-  // Submit score to contract
+  // Submit score to contract (wallet-less)
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
-    if (!contract || !walletConnected) {
-      console.log('❌ Wallet not connected or contract not initialized');
-      return false;
-    }
-
+    setIsSubmittingScore(true);
+    
     try {
-      setIsSubmittingScore(true);
-      console.log('📝 Submitting score to contract...', { time, username, fid, puzzleId });
+      // Show instructions to user for onchain submission
+      const timeInSeconds = (time / 1000).toFixed(1);
+      const contractAddress = CONTRACT_CONFIG.address;
       
-      const timeInMs = Math.round(time);
-      const tx = await contract.submitScore(
-        fid,
-        username,
-        timeInMs,
-        puzzleId,
-        {
-          gasLimit: 300000
-        }
-      );
+      console.log('📝 Score ready for onchain submission:', { 
+        time: Math.round(time), 
+        username, 
+        fid, 
+        puzzleId 
+      });
       
-      console.log('⏳ Waiting for transaction confirmation...');
-      await tx.wait();
+      // Create submission instructions
+      const submissionData = {
+        contractAddress,
+        functionName: 'submitScore',
+        parameters: [fid, username, Math.round(time), puzzleId],
+        network: 'Base Sepolia',
+        explorerUrl: `https://sepolia.basescan.org/address/${contractAddress}`
+      };
       
-      console.log('✅ Score submitted to contract successfully!');
+      console.log('🔗 Onchain submission data:', submissionData);
       
-      setTimeout(() => loadLeaderboard(), 1000);
-      
-      return true;
-    } catch (error) {
-      console.log('❌ Failed to submit score to contract:', error);
-      
-      // Fallback to local storage
+      // For now, save to localStorage as backup
       const stored = localStorage.getItem('inflynced-leaderboard');
       const scores = stored ? JSON.parse(stored) : [];
       scores.push({
-        player: walletAddress,
         fid: fid.toString(),
         username,
-        time: (time / 1000).toFixed(1),
+        displayName: currentUser?.displayName || username,
+        time: timeInSeconds,
         timestamp: Date.now(),
-        puzzleId
+        puzzleId,
+        onchainPending: true
       });
       scores.sort((a, b) => parseFloat(a.time) - parseFloat(b.time));
       localStorage.setItem('inflynced-leaderboard', JSON.stringify(scores.slice(0, 50)));
-      loadLeaderboard();
+      setLeaderboard(scores.slice(0, 10));
       
+      // Show user the submission instructions
+      alert(`🎉 Score recorded: ${timeInSeconds}s!\n\n⛓️ To submit onchain:\n1. Connect wallet to Base network\n2. Call submitScore(${fid}, "${username}", ${Math.round(time)}, ${puzzleId})\n3. Contract: ${contractAddress}`);
+      
+      return true;
+    } catch (error) {
+      console.log('❌ Failed to prepare score submission:', error);
       return false;
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [contract, walletConnected, walletAddress, loadLeaderboard]);
+  }, [currentUser]);
 
   // Load leaderboard on component mount
   useEffect(() => {
