@@ -96,17 +96,14 @@ const InflyncedPuzzle = () => {
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
   const [startTime, setStartTime] = useState(null);
-  const [endTime, setEndTime] = useState(null);
   const [totalTime, setTotalTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState('solid');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [particles, setParticles] = useState([]);
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
   const [currentUser, setCurrentUser] = useState({ username: '@anonymous', fid: null, displayName: 'Anonymous', pfpUrl: null });
   const [isMiniapp, setIsMiniapp] = useState(false);
-  const [isReady, setIsReady] = useState(false);
   const [snowParticles, setSnowParticles] = useState([]);
   const [showSnow, setShowSnow] = useState(false);
   
@@ -118,6 +115,20 @@ const InflyncedPuzzle = () => {
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
   const snowIntervalRef = useRef(null);
+
+  // Create new user function
+  const createNewUser = useCallback(() => {
+    const username = window.prompt('Enter your username:') || 'anonymous';
+    const newUser = { 
+      fid: Math.floor(Math.random() * 1000000),
+      username, 
+      displayName: username,
+      pfpUrl: null
+    };
+    localStorage.setItem('inflynced-user-profile', JSON.stringify(newUser));
+    setCurrentUser(newUser);
+    console.log('👤 Created new user:', newUser);
+  }, []);
 
   // Initialize Farcaster SDK and user context
   useEffect(() => {
@@ -147,36 +158,32 @@ const InflyncedPuzzle = () => {
               });
             }
             
-            // Call ready() to hide loading screen
-            await sdk.actions.ready();
-            setIsReady(true);
-            console.log('Farcaster SDK initialized successfully');
+                       // Call ready() to hide loading screen
+           await sdk.actions.ready();
+           console.log('Farcaster SDK initialized successfully');
             
           } catch (sdkError) {
             console.warn('Farcaster SDK not available, using fallback:', sdkError);
-            // Fallback for development/testing
-            setCurrentUser({
-              fid: Math.floor(Math.random() * 100000) + 1000,
-              username: '@testuser',
-              displayName: 'Test User',
-              pfpUrl: null
-            });
-            setIsReady(true);
+                         // Fallback for development/testing
+             setCurrentUser({
+               fid: Math.floor(Math.random() * 100000) + 1000,
+               username: '@testuser',
+               displayName: 'Test User',
+               pfpUrl: null
+             });
           }
                  } else {
            // Not in miniapp, use local storage or prompt
            createNewUser();
-           setIsReady(true);
          }
        } catch (error) {
          console.error('Failed to initialize Farcaster context:', error);
          createNewUser();
-         setIsReady(true);
        }
     };
 
-    initializeFarcaster();
-  }, []);
+         initializeFarcaster();
+   }, [createNewUser]);
 
   useEffect(() => {
     try {
@@ -233,19 +240,7 @@ const InflyncedPuzzle = () => {
     }
   }, [showSnow]);
 
-  // Create new user
-  const createNewUser = useCallback(() => {
-    const username = window.prompt('Enter your username:') || 'anonymous';
-    const newUser = { 
-      fid: Math.floor(Math.random() * 1000000),
-      username, 
-      displayName: username,
-      pfpUrl: null
-    };
-    localStorage.setItem('inflynced-user-profile', JSON.stringify(newUser));
-    setCurrentUser(newUser);
-    console.log('👤 Created new user:', newUser);
-  }, []);
+
 
   // Create fallback user for environments
   const createFallbackUser = useCallback(() => {
@@ -305,83 +300,29 @@ const InflyncedPuzzle = () => {
     setTimeout(initializeUser, 1000);
   }, [createFallbackUser]);
 
-  // Initialize Web3 and connect to Base contract
+  // Test contract connection on load
   useEffect(() => {
-    const initializeWeb3 = async () => {
+    const testContract = async () => {
       try {
-        if (window.ethereum) {
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          const network = await provider.getNetwork();
+        if (CONTRACT_CONFIG.address !== '0x1234567890123456789012345678901234567890') {
+          console.log('🧪 Testing contract connection...');
+          const provider = new ethers.providers.JsonRpcProvider(CONTRACT_CONFIG.rpcUrl);
+          const contract = new ethers.Contract(
+            CONTRACT_CONFIG.address,
+            CONTRACT_CONFIG.abi,
+            provider
+          );
           
-          console.log('🌐 Connected to network:', network.name, network.chainId);
-          
-          // Check if we're on Base or Base Sepolia
-          if (network.chainId === 8453 || network.chainId === 84532) {
-            console.log('✅ Connected to Base network');
-            
-            // Request account access
-            try {
-              const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-              if (accounts.length > 0) {
-                // setWalletAddress(accounts[0]); // Removed wallet-related state
-                // setWalletConnected(true); // Removed wallet-related state
-                
-                // Initialize contract
-                const signer = provider.getSigner();
-                const contractInstance = new ethers.Contract(
-                  CONTRACT_CONFIG.address,
-                  CONTRACT_CONFIG.abi,
-                  signer
-                );
-                // setContract(contractInstance); // Removed contract-related state
-                
-                console.log('✅ Contract initialized:', CONTRACT_CONFIG.address);
-              }
-            } catch (walletError) {
-              console.log('❌ Wallet connection failed:', walletError);
-            }
-          } else {
-            console.log('⚠️ Please switch to Base network');
-          }
-        } else {
-          console.log('❌ No Web3 wallet detected');
+          const totalScores = await contract.getTotalScores();
+          console.log('✅ Contract connected! Total scores:', totalScores.toString());
         }
       } catch (error) {
-        console.log('❌ Web3 initialization failed:', error);
+        console.log('⚠️ Contract connection test failed:', error);
       }
     };
 
-    initializeWeb3();
+    testContract();
   }, []);
-
-  // Connect wallet function
-  const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        alert('Please install MetaMask or another Web3 wallet');
-        return;
-      }
-
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      if (accounts.length > 0) {
-        // setWalletAddress(accounts[0]); // Removed wallet-related state
-        // setWalletConnected(true); // Removed wallet-related state
-        
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
-        const contractInstance = new ethers.Contract(
-          CONTRACT_CONFIG.address,
-          CONTRACT_CONFIG.abi,
-          signer
-        );
-        // setContract(contractInstance); // Removed contract-related state
-        
-        console.log('✅ Wallet connected:', accounts[0]);
-      }
-    } catch (error) {
-      console.log('❌ Wallet connection failed:', error);
-    }
-  };
 
   // Load leaderboard from contract
   const loadLeaderboard = useCallback(async () => {
