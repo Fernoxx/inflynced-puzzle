@@ -1,11 +1,11 @@
 /**
- * InflyncedPuzzle - A sliding puzzle game for Farcaster
- * Features: Image-based puzzles, leaderboards, responsive design, keyboard controls
- * Updated: Fixed layout and styling issues for proper deployment
+ * InflyncedPuzzle - A sliding puzzle game for Farcaster with Wallet Integration
+ * Features: Image-based puzzles, leaderboards, responsive design, Farcaster wallet connection
+ * Updated: Added proper Farcaster wallet connection support
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Trophy, RefreshCw, Palette } from 'lucide-react';
+import { Play, Trophy, RefreshCw, Palette, Wallet } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -42,6 +42,14 @@ const InflyncedPuzzle = () => {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showSnowEffect, setShowSnowEffect] = useState(false);
+  
+  // Wallet connection states
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [walletType, setWalletType] = useState(null);
+  const [sdkInstance, setSdkInstance] = useState(null);
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+  const [walletError, setWalletError] = useState(null);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -83,7 +91,147 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-  // Initialize SDK with proper Farcaster context reading
+  // Function to connect Farcaster wallet
+  const connectFarcasterWallet = async (sdk) => {
+    try {
+      console.log('🔗 Attempting to connect Farcaster wallet...');
+      
+      // Method 1: Check if wallet is already available in context
+      const context = await sdk.context;
+      if (context?.wallet && context.wallet.address) {
+        console.log('✅ Wallet found in context:', context.wallet.address);
+        return {
+          address: context.wallet.address,
+          chainId: context.wallet.chainId || 8453,
+          type: 'farcaster'
+        };
+      }
+      
+      // Method 2: Try new wallet connect API
+      if (sdk.wallet && typeof sdk.wallet.connect === 'function') {
+        console.log('📱 Using new wallet connect API');
+        const result = await sdk.wallet.connect();
+        console.log('✅ Wallet connected via new API:', result);
+        return {
+          address: result.address,
+          chainId: result.chainId || 8453,
+          type: 'farcaster'
+        };
+      }
+      
+      // Method 3: Try legacy wallet connection
+      if (sdk.actions && typeof sdk.actions.connectWallet === 'function') {
+        console.log('📱 Using legacy wallet connect API');
+        const result = await sdk.actions.connectWallet();
+        console.log('✅ Wallet connected via legacy API:', result);
+        return {
+          address: result.address,
+          chainId: result.chainId || 8453,
+          type: 'farcaster'
+        };
+      }
+      
+      // Method 4: Check if wallet property exists
+      if (sdk.wallet && sdk.wallet.address) {
+        console.log('📱 Using existing wallet property');
+        return {
+          address: sdk.wallet.address,
+          chainId: sdk.wallet.chainId || 8453,
+          type: 'farcaster'
+        };
+      }
+      
+      console.log('❌ No Farcaster wallet connection method available');
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Farcaster wallet connection failed:', error);
+      throw error;
+    }
+  };
+
+  // Manual wallet connection
+  const connectWallet = async () => {
+    setIsConnectingWallet(true);
+    setWalletError(null);
+    
+    try {
+      console.log('🔄 Starting manual wallet connection...');
+      
+      // First try Farcaster wallet if available
+      if (sdkInstance && isInFarcaster) {
+        console.log('🔗 Attempting Farcaster wallet connection...');
+        const result = await connectFarcasterWallet(sdkInstance);
+        if (result) {
+          setWalletAddress(result.address);
+          setWalletType('farcaster');
+          setWalletConnected(true);
+          console.log('✅ Farcaster wallet connected successfully');
+          return;
+        }
+      }
+      
+      // Fallback to browser wallet
+      if (window.ethereum) {
+        console.log('🔄 Falling back to browser wallet...');
+        
+        // Identify wallet type
+        let walletName = 'unknown';
+        if (window.ethereum.isCoinbaseWallet) {
+          walletName = 'coinbase';
+        } else if (window.ethereum.isMetaMask) {
+          walletName = 'metamask';
+        } else if (window.ethereum.isRabby) {
+          walletName = 'rabby';
+        }
+        
+        console.log('📱 Detected wallet:', walletName);
+        
+        // Request account access
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+        
+        if (accounts.length > 0) {
+          const address = accounts[0];
+          
+          // Get chain ID
+          const chainId = await window.ethereum.request({
+            method: 'eth_chainId'
+          });
+          
+          setWalletAddress(address);
+          setWalletType(walletName);
+          setWalletConnected(true);
+          
+          console.log('✅ External wallet connected:', {
+            address,
+            chainId: parseInt(chainId, 16),
+            type: walletName
+          });
+        }
+      } else {
+        throw new Error('No wallet detected. Please install a wallet like MetaMask or use Farcaster mobile app.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Wallet connection failed:', error);
+      setWalletError(error.message);
+    } finally {
+      setIsConnectingWallet(false);
+    }
+  };
+
+  // Disconnect wallet
+  const disconnectWallet = useCallback(() => {
+    setWalletAddress(null);
+    setWalletType(null);
+    setWalletConnected(false);
+    setWalletError(null);
+    console.log('🔌 Wallet disconnected');
+  }, []);
+
+  // Initialize SDK with proper Farcaster context reading and wallet connection
   useEffect(() => {
     const initializeMiniapp = async () => {
       try {
@@ -91,31 +239,49 @@ const InflyncedPuzzle = () => {
         
         // Import and initialize Farcaster SDK
         const { sdk } = await import('@farcaster/miniapp-sdk');
+        setSdkInstance(sdk);
+        
+        // CRITICAL: Always call ready() first
+        await sdk.actions.ready();
+        console.log('✅ SDK ready() called - loading screen hidden');
         
         // Wait for SDK to be ready and get user context
         const context = await sdk.context;
         console.log('📱 Farcaster context:', context);
         
         if (context?.user) {
-          // Extract real user data as per Farcaster guidelines
+          // Extract real user data
           const userProfile = {
-            fid: context.user.fid,           // Real FID (e.g., 242597)
-            username: context.user.username, // Real username (e.g., "ferno")
-            displayName: context.user.displayName, // Real display name
-            pfpUrl: context.user.pfpUrl      // Profile picture
+            fid: context.user.fid,
+            username: context.user.username,
+            displayName: context.user.displayName,
+            pfpUrl: context.user.pfpUrl
           };
           setUserProfile(userProfile);
           setIsInFarcaster(true);
           console.log('✅ Real Farcaster user profile:', userProfile);
+          
+          // Try to connect wallet automatically
+          try {
+            console.log('🔗 Attempting automatic wallet connection...');
+            const walletResult = await connectFarcasterWallet(sdk);
+            if (walletResult) {
+              setWalletAddress(walletResult.address);
+              setWalletType('farcaster');
+              setWalletConnected(true);
+              console.log('✅ Automatic wallet connection successful');
+            } else {
+              console.log('⚠️ Automatic wallet connection failed - user can connect manually');
+            }
+          } catch (walletError) {
+            console.log('⚠️ Automatic wallet connection error:', walletError);
+            // Continue without wallet - user can connect manually
+          }
         } else {
           console.log('❌ No Farcaster user context found');
           setIsInFarcaster(false);
           getFallbackUserProfile();
         }
-        
-        // Critical: Call ready() to hide loading screen
-        await sdk.actions.ready();
-        console.log('✅ SDK ready() called - loading screen hidden');
         
         setIsLoading(false);
         console.log('✅ Miniapp initialized successfully!');
@@ -130,6 +296,104 @@ const InflyncedPuzzle = () => {
 
     initializeMiniapp();
   }, [getFallbackUserProfile]);
+
+  // Wallet Status Component
+  const WalletStatus = () => (
+    <div style={{ 
+      padding: '8px 16px', 
+      backgroundColor: walletConnected ? '#e8f5e8' : '#fff3cd',
+      borderBottom: '1px solid #e0e0e0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontSize: '12px', color: '#666' }}>
+          {walletConnected ? '🔗 Wallet Connected' : '⚠️ Wallet Not Connected'}
+        </span>
+        {walletConnected && walletAddress && (
+          <span style={{ 
+            fontFamily: 'monospace', 
+            fontSize: '10px', 
+            color: '#333',
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            padding: '2px 6px',
+            borderRadius: '4px'
+          }}>
+            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+          </span>
+        )}
+        {walletConnected && walletType && (
+          <span style={{ 
+            fontSize: '10px', 
+            color: walletType === 'farcaster' ? '#4CAF50' : '#FF9800',
+            fontWeight: 'bold',
+            backgroundColor: 'rgba(0,0,0,0.1)',
+            padding: '2px 6px',
+            borderRadius: '4px'
+          }}>
+            {walletType === 'farcaster' ? 'FARCASTER' : walletType.toUpperCase()}
+          </span>
+        )}
+      </div>
+      
+      <div style={{ display: 'flex', gap: '4px' }}>
+        {!walletConnected ? (
+          <button
+            onClick={connectWallet}
+            disabled={isConnectingWallet}
+            style={{
+              backgroundColor: '#8B5CF6',
+              color: 'white',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '10px',
+              cursor: isConnectingWallet ? 'not-allowed' : 'pointer',
+              opacity: isConnectingWallet ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {isConnectingWallet ? (
+              <>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  border: '1px solid transparent',
+                  borderTop: '1px solid white',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Connecting...
+              </>
+            ) : (
+              <>
+                <Wallet size={12} />
+                Connect
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={disconnectWallet}
+            style={{
+              backgroundColor: '#f44336',
+              color: 'white',
+              border: 'none',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '10px',
+              cursor: 'pointer'
+            }}
+          >
+            Disconnect
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   // Snow animation effect
   const createSnowflake = useCallback(() => {
@@ -523,7 +787,7 @@ const InflyncedPuzzle = () => {
             fontSize: '14px',
             margin: 0
           }}>
-            Initializing Farcaster miniapp
+            Initializing Farcaster miniapp & wallet
           </p>
         </div>
         <style>
@@ -683,6 +947,22 @@ const InflyncedPuzzle = () => {
           </div>
         </div>
 
+        {/* Wallet Status */}
+        <WalletStatus />
+
+        {/* Wallet Error Display */}
+        {walletError && (
+          <div style={{
+            padding: '8px 16px',
+            backgroundColor: '#ffebee',
+            borderBottom: '1px solid #ffcdd2',
+            fontSize: '11px',
+            color: '#c62828'
+          }}>
+            ⚠️ {walletError}
+          </div>
+        )}
+
         {/* Game Status */}
         {gameState === 'playing' && (
           <div style={{
@@ -779,6 +1059,20 @@ const InflyncedPuzzle = () => {
                   Solve an image puzzle as fast as you can!
                 </p>
               </div>
+              
+              {/* Wallet Connection Status in Menu */}
+              {!walletConnected && (
+                <div style={{
+                  backgroundColor: '#fff3cd',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                  fontSize: '12px',
+                  color: '#856404'
+                }}>
+                  💡 Connect your wallet to save scores onchain!
+                </div>
+              )}
               
               {/* Start Game Button */}
               <button
@@ -888,6 +1182,21 @@ const InflyncedPuzzle = () => {
                 You completed puzzle {currentPuzzle?.id} in {Math.floor(totalTime / 60)}:{(totalTime % 60).toString().padStart(2, '0')}
               </p>
               
+              {/* Wallet connection reminder */}
+              {!walletConnected && (
+                <div style={{
+                  backgroundColor: '#fff3cd',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  fontSize: '11px',
+                  color: '#856404',
+                  textAlign: 'center'
+                }}>
+                  💡 Connect wallet to save onchain scores!
+                </div>
+              )}
+              
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={startGame}
@@ -937,7 +1246,7 @@ const InflyncedPuzzle = () => {
           textAlign: 'center'
         }}>
           <p style={{ fontSize: '10px', color: '#999', margin: 0 }}>
-            Built for Farcaster • {isInFarcaster ? 'Connected' : 'Standalone'} Mode
+            Built for Farcaster • {isInFarcaster ? 'Connected' : 'Standalone'} • {walletConnected ? 'Wallet Connected' : 'Wallet Disconnected'}
           </p>
         </div>
       </div>
@@ -948,6 +1257,10 @@ const InflyncedPuzzle = () => {
           @keyframes snowfall {
             0% { transform: translateY(-10px) rotate(0deg); }
             100% { transform: translateY(100vh) rotate(360deg); }
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
         `}
       </style>
