@@ -812,22 +812,6 @@ const InflyncedPuzzle = () => {
               >
                 <Trophy size={16} />
               </button>
-              {/* Removed wallet connection button */}
-              <button
-                onClick={() => setBackgroundMode(backgroundMode === 'solid' ? 'gradient' : 'solid')}
-                style={{
-                  padding: '6px',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: '6px',
-                  color: '#666',
-                  border: '1px solid #e0e0e0',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-                title="Toggle Background"
-              >
-                <Palette size={16} />
-              </button>
             </div>
           </div>
 
