@@ -4,41 +4,64 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="InflyncedPuzzle - A sliding puzzle game with onchain leaderboard"
-    />
+    <meta name="theme-color" content="#E9520B" />
+    <meta name="description" content="InflyncedPuzzle - Image sliding puzzle game for Farcaster with onchain leaderboard" />
+    
+    <!-- Open Graph Meta Tags for Farcaster -->
+    <meta property="og:title" content="InflyncedPuzzle" />
+    <meta property="og:description" content="Solve image sliding puzzles as fast as you can! Compete on the onchain leaderboard." />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="og:url" content="https://inflynced-puzzle.vercel.app" />
+    <meta property="og:type" content="website" />
+    
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InflyncedPuzzle" />
+    <meta name="twitter:description" content="Solve image sliding puzzles as fast as you can! Compete on the onchain leaderboard." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/og-image.png" />
+    
+    <!-- Farcaster Frame Meta Tags -->
+    <meta property="fc:frame" content="vNext" />
+    <meta property="fc:frame:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="fc:frame:button:1" content="🧩 Play Puzzle" />
+    <meta property="fc:frame:button:1:action" content="link" />
+    <meta property="fc:frame:button:1:target" content="https://inflynced-puzzle.vercel.app" />
+    
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
-
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <!-- Deployment fix: Updated dependencies and removed conflicts -->
+    
     <title>InflyncedPuzzle</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              orange: {
+                primary: '#E9520B'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style>
+      @keyframes twinkle {
+        0% { opacity: 0.4; transform: scale(1); }
+        100% { opacity: 1; transform: scale(1.1); }
+      }
+      
+      @keyframes snowfall {
+        0% { transform: translateY(-100px) translateX(0px); }
+        100% { transform: translateY(100vh) translateX(50px); }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
   </body>
 </html>
