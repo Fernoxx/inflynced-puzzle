@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Trophy, RefreshCw } from 'lucide-react';
+import { Play, Trophy, RefreshCw, Palette } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -164,15 +164,15 @@ const InflyncedPuzzle = () => {
     if (showSnowEffect) {
       snowflakesRef.current = Array.from({ length: 20 }, createSnowflake);
       animateSnow();
+    } else {
+      snowflakesRef.current = [];
     }
   }, [showSnowEffect, animateSnow, createSnowflake]);
 
-  // Trigger snow effect when clicking the first picture button
-  const handleFirstPictureClick = useCallback(() => {
-    setShowSnowEffect(true);
-    // Auto-hide snow effect after 5 seconds
-    setTimeout(() => setShowSnowEffect(false), 5000);
-  }, []);
+  // Toggle snow effect UI
+  const toggleSnowEffect = useCallback(() => {
+    setShowSnowEffect(!showSnowEffect);
+  }, [showSnowEffect]);
 
   // Load shared leaderboard from API with better error handling
   const loadSharedLeaderboard = useCallback(async () => {
@@ -260,20 +260,26 @@ const InflyncedPuzzle = () => {
       }
     }
 
-    // Shuffle the board
-    const shuffled = [...solved];
+    // Shuffle the board using valid moves only
+    const shuffled = JSON.parse(JSON.stringify(solved)); // Deep copy
+    let currentEmptyPos = { row: 2, col: 2 };
+    
+    // Perform 1000 random valid moves to shuffle
     for (let i = 0; i < 1000; i++) {
-      const moves = getPossibleMoves(shuffled, getEmptyPosition(shuffled));
-      if (moves.length > 0) {
-        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-        shuffled[randomMove.row][randomMove.col] = shuffled[2][2];
-        shuffled[2][2] = null;
+      const possibleMoves = getPossibleMoves(shuffled, currentEmptyPos);
+      if (possibleMoves.length > 0) {
+        const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+        
+        // Swap the tile with empty space
+        shuffled[currentEmptyPos.row][currentEmptyPos.col] = shuffled[randomMove.row][randomMove.col];
+        shuffled[randomMove.row][randomMove.col] = null;
+        
         // Update empty position
-        const newEmpty = { row: randomMove.row, col: randomMove.col };
-        setEmptyPos(newEmpty);
+        currentEmptyPos = { row: randomMove.row, col: randomMove.col };
       }
     }
-
+    
+    setEmptyPos(currentEmptyPos);
     return shuffled;
   }, []);
 
@@ -369,12 +375,14 @@ const InflyncedPuzzle = () => {
     if (!tile) return {};
     
     const { correctRow, correctCol } = tile;
-    const backgroundPositionX = -(correctCol * 74);
-    const backgroundPositionY = -(correctRow * 74);
+    // Fixed tile size calculation for proper image display
+    const tileSize = 74; // Each tile is 74px
+    const backgroundPositionX = -(correctCol * tileSize);
+    const backgroundPositionY = -(correctRow * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '222px 222px',
+      backgroundSize: `${tileSize * 3}px ${tileSize * 3}px`, // 222px x 222px total
       backgroundPosition: `${backgroundPositionX}px ${backgroundPositionY}px`,
       backgroundRepeat: 'no-repeat'
     };
@@ -533,13 +541,16 @@ const InflyncedPuzzle = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
+      background: showSnowEffect 
+        ? 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)' 
+        : 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px',
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      position: 'relative'
+      position: 'relative',
+      transition: 'background 0.5s ease'
     }}>
       {/* Snow Effect */}
       {showSnowEffect && (
@@ -605,6 +616,23 @@ const InflyncedPuzzle = () => {
           </div>
           
           <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Snow Effect Toggle Button */}
+            <button
+              onClick={toggleSnowEffect}
+              style={{
+                padding: '6px',
+                backgroundColor: showSnowEffect ? '#34495e' : '#ff5722',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '10px'
+              }}
+              title={showSnowEffect ? 'Switch to Normal UI' : 'Switch to Snow UI'}
+            >
+              <Palette size={12} />
+            </button>
+            
             {gameState === 'playing' && (
               <>
                 <button
@@ -752,12 +780,9 @@ const InflyncedPuzzle = () => {
                 </p>
               </div>
               
-              {/* First Picture Button with Snow Effect */}
+              {/* Start Game Button */}
               <button
-                onClick={() => {
-                  handleFirstPictureClick();
-                  startGame();
-                }}
+                onClick={startGame}
                 style={{
                   backgroundColor: '#ff5722',
                   color: 'white',
