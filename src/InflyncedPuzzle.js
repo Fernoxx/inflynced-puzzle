@@ -1,6 +1,6 @@
 /**
- * InflyncedPuzzle - A sliding puzzle game for Farcaster with onchain leaderboard
- * Features: Real Farcaster user detection, Base contract integration, proper sharing
+ * InflyncedPuzzle - A sliding puzzle game with onchain leaderboard
+ * Features: Web3/Base contract integration, proper sharing, user management
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -28,7 +28,7 @@ const IMAGE_PUZZLES = [
 
 // Contract configuration for Base
 const CONTRACT_CONFIG = {
-  address: process.env.REACT_APP_CONTRACT_ADDRESS || '0x1234567890123456789012345678901234567890', // Will be updated after deployment
+  address: process.env.REACT_APP_CONTRACT_ADDRESS || '0x1234567890123456789012345678901234567890',
   abi: [
     {
       "inputs": [
@@ -75,7 +75,7 @@ const CONTRACT_CONFIG = {
 
 const InflyncedPuzzle = () => {
   // Game state
-  const [gameState, setGameState] = useState('loading'); // loading, menu, playing, completed
+  const [gameState, setGameState] = useState('loading');
   const [currentPuzzle, setCurrentPuzzle] = useState(null);
   const [board, setBoard] = useState([]);
   const [emptyPos, setEmptyPos] = useState({ row: 2, col: 2 });
@@ -87,10 +87,8 @@ const InflyncedPuzzle = () => {
   const [progress, setProgress] = useState(0);
   const [imageErrors, setImageErrors] = useState(new Set());
   
-  // Farcaster & Web3 state
+  // User & Web3 state
   const [currentUser, setCurrentUser] = useState(null);
-  const [isInFarcaster, setIsInFarcaster] = useState(false);
-  const [sdkInstance, setSdkInstance] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
   const [contract, setContract] = useState(null);
@@ -112,68 +110,21 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // 🔑 Initialize Farcaster SDK and detect real user data
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const initializeFarcaster = async () => {
-      try {
-        console.log('🔄 Initializing Farcaster SDK...');
-        
-        // Check if we're in Farcaster miniapp environment
-        const isInMiniapp = window.parent !== window || window.location !== window.parent.location;
-        
-        if (isInMiniapp) {
-          // Import Farcaster SDK
-          const { sdk } = await import('@farcaster/miniapp-sdk');
-          setSdkInstance(sdk);
-          
-          // Call ready() to dismiss loading screen
-          await sdk.actions.ready();
-          console.log('✅ SDK ready() called successfully');
-          
-          // Get real user context
-          const context = await sdk.context;
-          console.log('📋 Full SDK context:', context);
-          
-          if (context?.user) {
-            console.log('👤 Raw user data from context:', context.user);
-            
-            // Extract real Farcaster user data
-            const farcasterUser = {
-              fid: context.user.fid,           // Real FID (e.g., 242597)
-              username: context.user.username, // Real username (e.g., "ferno")
-              displayName: context.user.displayName, // Real display name
-              pfpUrl: context.user.pfpUrl      // Profile picture
-            };
-            
-            console.log('✅ Real Farcaster user detected:', farcasterUser);
-            setCurrentUser(farcasterUser);
-            setIsInFarcaster(true);
-          } else {
-            console.log('❌ No user in Farcaster context');
-            setIsInFarcaster(false);
-            createFallbackUser();
-          }
-        } else {
-          console.log('📱 Not in Farcaster miniapp, using fallback');
-          setIsInFarcaster(false);
-          createFallbackUser();
-        }
-        
-        setGameState('menu');
-        
-      } catch (error) {
-        console.log('❌ Farcaster SDK initialization failed:', error);
-        setIsInFarcaster(false);
-        createFallbackUser();
-        setGameState('menu');
-      }
+  // Create new user
+  const createNewUser = useCallback(() => {
+    const username = window.prompt('Enter your username:') || 'anonymous';
+    const newUser = { 
+      fid: Math.floor(Math.random() * 1000000),
+      username, 
+      displayName: username,
+      pfpUrl: null
     };
-
-    initializeFarcaster();
+    localStorage.setItem('inflynced-user-profile', JSON.stringify(newUser));
+    setCurrentUser(newUser);
+    console.log('👤 Created new user:', newUser);
   }, []);
 
-  // Create fallback user for non-Farcaster environments
+  // Create fallback user for environments
   const createFallbackUser = useCallback(() => {
     const stored = localStorage.getItem('inflynced-user-profile');
     if (stored) {
@@ -187,20 +138,49 @@ const InflyncedPuzzle = () => {
     } else {
       createNewUser();
     }
-  }, []);
+  }, [createNewUser]);
 
-  const createNewUser = () => {
-    const username = window.prompt('Enter your username:') || 'anonymous';
-    const fallbackUser = { 
-      fid: Math.floor(Math.random() * 1000000), // Random FID for demo
-      username, 
-      displayName: username,
-      pfpUrl: null
+  // Initialize user system
+  useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        console.log('🔄 Initializing user system...');
+        
+        // Check if we're in Farcaster (simple detection)
+        const urlParams = new URLSearchParams(window.location.search);
+        const farcasterUsername = urlParams.get('username');
+        const farcasterFid = urlParams.get('fid');
+        
+        if (farcasterUsername && farcasterFid) {
+          // Use Farcaster URL parameters if available
+          const farcasterUser = {
+            fid: parseInt(farcasterFid),
+            username: farcasterUsername,
+            displayName: farcasterUsername,
+            pfpUrl: null,
+            isFromFarcaster: true
+          };
+          
+          console.log('✅ Farcaster user detected from URL:', farcasterUser);
+          setCurrentUser(farcasterUser);
+        } else {
+          // Use fallback system
+          console.log('📱 Using fallback user system');
+          createFallbackUser();
+        }
+        
+        setGameState('menu');
+        
+      } catch (error) {
+        console.log('❌ User initialization failed:', error);
+        createFallbackUser();
+        setGameState('menu');
+      }
     };
-    localStorage.setItem('inflynced-user-profile', JSON.stringify(fallbackUser));
-    setCurrentUser(fallbackUser);
-    console.log('👤 Created new user:', fallbackUser);
-  };
+
+    // Small delay to show loading screen
+    setTimeout(initializeUser, 1000);
+  }, [createFallbackUser]);
 
   // Initialize Web3 and connect to Base contract
   useEffect(() => {
@@ -259,13 +239,11 @@ const InflyncedPuzzle = () => {
         return;
       }
 
-      // Request account access
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       if (accounts.length > 0) {
         setWalletAddress(accounts[0]);
         setWalletConnected(true);
         
-        // Initialize contract
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const contractInstance = new ethers.Contract(
@@ -295,7 +273,7 @@ const InflyncedPuzzle = () => {
           player: score.player,
           fid: score.fid.toString(),
           username: score.username,
-          time: (Number(score.time) / 1000).toFixed(1), // Convert to seconds
+          time: (Number(score.time) / 1000).toFixed(1),
           timestamp: Number(score.timestamp),
           puzzleId: Number(score.puzzleId)
         }));
@@ -304,7 +282,6 @@ const InflyncedPuzzle = () => {
         console.log('✅ Leaderboard loaded:', formattedScores.length, 'scores');
       } else {
         console.log('❌ Contract not initialized');
-        // Fallback to local storage
         const stored = localStorage.getItem('inflynced-leaderboard');
         if (stored) {
           const parsed = JSON.parse(stored);
@@ -313,7 +290,6 @@ const InflyncedPuzzle = () => {
       }
     } catch (error) {
       console.log('❌ Failed to load leaderboard:', error);
-      // Fallback to local storage
       const stored = localStorage.getItem('inflynced-leaderboard');
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -324,7 +300,7 @@ const InflyncedPuzzle = () => {
     }
   }, [contract]);
 
-  // Submit score to contract (requires wallet signature)
+  // Submit score to contract
   const submitScoreToContract = useCallback(async (time, username, fid, puzzleId) => {
     if (!contract || !walletConnected) {
       console.log('❌ Wallet not connected or contract not initialized');
@@ -335,7 +311,7 @@ const InflyncedPuzzle = () => {
       setIsSubmittingScore(true);
       console.log('📝 Submitting score to contract...', { time, username, fid, puzzleId });
       
-      const timeInMs = Math.round(time); // Ensure integer
+      const timeInMs = Math.round(time);
       const tx = await contract.submitScore(
         fid,
         username,
@@ -351,7 +327,6 @@ const InflyncedPuzzle = () => {
       
       console.log('✅ Score submitted to contract successfully!');
       
-      // Reload leaderboard
       setTimeout(() => loadLeaderboard(), 1000);
       
       return true;
@@ -412,7 +387,7 @@ const InflyncedPuzzle = () => {
   const checkWin = useCallback((board) => {
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue; // Skip empty space
+        if (i === 2 && j === 2) continue;
         if (!board[i][j] || board[i][j].correctPos.row !== i || board[i][j].correctPos.col !== j) {
           return false;
         }
@@ -427,7 +402,7 @@ const InflyncedPuzzle = () => {
     
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
-        if (i === 2 && j === 2) continue; // Skip empty space
+        if (i === 2 && j === 2) continue;
         if (board[i][j] && board[i][j].correctPos.row === i && board[i][j].correctPos.col === j) {
           correctTiles++;
         }
@@ -464,13 +439,11 @@ const InflyncedPuzzle = () => {
         setTotalTime(finalTime);
         setGameState('completed');
         
-        // Submit score to contract if user is authenticated
         if (currentUser && currentUser.username && currentUser.fid) {
           console.log('🎯 Game won! Submitting score for user:', currentUser);
           submitScoreToContract(finalTime, currentUser.username, currentUser.fid, currentPuzzle.id);
         }
         
-        // Victory sound sequence
         setTimeout(() => playSound(523, 0.2), 0);
         setTimeout(() => playSound(659, 0.2), 200);
         setTimeout(() => playSound(784, 0.4), 400);
@@ -487,7 +460,7 @@ const InflyncedPuzzle = () => {
       board[i] = [];
       for (let j = 0; j < 3; j++) {
         if (i === 2 && j === 2) {
-          board[i][j] = null; // Empty space
+          board[i][j] = null;
         } else {
           board[i][j] = {
             value: tileIndex + 1,
@@ -507,7 +480,6 @@ const InflyncedPuzzle = () => {
     const newBoard = board.map(row => [...row]);
     let emptyRow = 2, emptyCol = 2;
     
-    // Generate valid moves to ensure solvability
     const moves = 500 + Math.floor(Math.random() * 500);
     
     for (let i = 0; i < moves; i++) {
@@ -547,36 +519,13 @@ const InflyncedPuzzle = () => {
     setGameState('playing');
   }, [generateBoard, shuffleBoard, calculateProgress]);
 
-  // 🔗 Fixed share function with correct URL
+  // Fixed share function with correct URL
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     const text = `🧩 I just solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
-    // Use CORRECT URL - inflyncedpuzzle.vercel.app
     const CORRECT_URL = "https://inflyncedpuzzle.vercel.app";
     
-    // Use Farcaster composeCast if available
-    if (sdkInstance && isInFarcaster) {
-      try {
-        const result = await sdkInstance.actions.composeCast({
-          text: text,
-          embeds: [{
-            url: CORRECT_URL
-          }]
-        });
-        
-        if (result?.cast) {
-          console.log('✅ Cast shared successfully:', result.cast.hash);
-        } else {
-          console.log('Cast sharing was cancelled');
-        }
-        return;
-      } catch (error) {
-        console.log('Failed to use Farcaster composeCast:', error);
-      }
-    }
-    
-    // Fallback to Web Share API or clipboard
     if (navigator.share) {
       try {
         await navigator.share({
@@ -588,12 +537,10 @@ const InflyncedPuzzle = () => {
         console.log('Web Share cancelled or failed:', error);
       }
     } else {
-      // Clipboard fallback
       try {
         await navigator.clipboard.writeText(`${text}\n\n${CORRECT_URL}`);
         window.alert('Result copied to clipboard!');
       } catch (error) {
-        // Manual copy fallback
         const textArea = document.createElement('textarea');
         textArea.value = `${text}\n\n${CORRECT_URL}`;
         document.body.appendChild(textArea);
@@ -603,7 +550,7 @@ const InflyncedPuzzle = () => {
         window.alert('Result copied to clipboard!');
       }
     }
-  }, [totalTime, sdkInstance, isInFarcaster]);
+  }, [totalTime]);
 
   // Timer effect
   useEffect(() => {
@@ -674,13 +621,13 @@ const InflyncedPuzzle = () => {
   const getTileStyle = (tile) => {
     if (!tile) return {};
     
-    const tileSize = 74; // Updated for new compact design
+    const tileSize = 74;
     const backgroundX = -(tile.correctPos.col * tileSize);
     const backgroundY = -(tile.correctPos.row * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: '222px 222px', // 3 * 74 = 222
+      backgroundSize: '222px 222px',
       backgroundPosition: `${backgroundX}px ${backgroundY}px`,
       backgroundRepeat: 'no-repeat'
     };
@@ -691,7 +638,7 @@ const InflyncedPuzzle = () => {
   };
 
   const changeUsername = () => {
-    if (isInFarcaster) {
+    if (currentUser?.isFromFarcaster) {
       alert('Username is managed by Farcaster and cannot be changed.');
       return;
     }
@@ -720,13 +667,8 @@ const InflyncedPuzzle = () => {
           <div style={{ fontSize: '64px', marginBottom: '20px', animation: 'pulse 2s infinite' }}>🧩</div>
           <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '12px' }}>Loading InflyncedPuzzle...</h2>
           <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px' }}>
-            Detecting Farcaster context and initializing game...
+            Initializing game and checking for user context...
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '4px', marginTop: '20px' }}>
-            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', opacity: 0.3, animation: 'bounce 1.4s ease-in-out infinite' }}></div>
-            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', opacity: 0.3, animation: 'bounce 1.4s ease-in-out infinite 0.2s' }}></div>
-            <div style={{ width: '8px', height: '8px', backgroundColor: 'white', borderRadius: '50%', opacity: 0.3, animation: 'bounce 1.4s ease-in-out infinite 0.4s' }}></div>
-          </div>
         </div>
       </div>
     );
@@ -844,7 +786,7 @@ const InflyncedPuzzle = () => {
                 >
                   @{currentUser.username}
                 </button>
-                {isInFarcaster && (
+                {currentUser.isFromFarcaster && (
                   <span style={{
                     fontSize: '9px',
                     backgroundColor: '#e8f5e8',
@@ -858,7 +800,7 @@ const InflyncedPuzzle = () => {
                 )}
               </div>
               <div style={{ fontSize: '9px', color: '#999', marginTop: '2px' }}>
-                FID: {currentUser.fid} | In FC: {isInFarcaster ? 'Yes' : 'No'}
+                FID: {currentUser.fid} | Type: {currentUser.isFromFarcaster ? 'Farcaster' : 'Local'}
                 {walletConnected && <span> | Wallet: ✅</span>}
               </div>
             </div>
