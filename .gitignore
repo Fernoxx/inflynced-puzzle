@@ -8,12 +8,14 @@ yarn-error.log*
 build/
 dist/
 
-# Environment variables
-.env
+# Environment variables (private keys, secrets)
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Note: .env is committed because it only contains public contract info
+# NEVER commit files with private keys or secrets
 
 # IDE files
 .vscode/
