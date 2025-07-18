@@ -624,38 +624,50 @@ const InflyncedPuzzle = () => {
     setGameState('playing');
   }, [generateBoard, shuffleBoard, calculateProgress]);
 
-  // Fixed share function with correct URL
+  // Share function that redirects to Farcaster cast
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
-    const text = `🧩 I just solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
+    const text = `🧩 I just solved the InflyncedPuzzle in ${timeInSeconds} seconds! Can you beat my time?`;
+    const miniappUrl = "https://inflynced-puzzle.vercel.app";
     
-    const CORRECT_URL = "https://inflyncedpuzzle.vercel.app";
+    // Create the full cast text
+    const castText = `${text}\n\nPlay now: ${miniappUrl}\n\n#InflyncedPuzzle #Farcaster #Puzzle #Gaming`;
     
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'InflyncedPuzzle - I solved it!',
-          text: text,
-          url: CORRECT_URL,
-        });
-      } catch (error) {
-        console.log('Web Share cancelled or failed:', error);
+    try {
+      // Try to use Farcaster SDK if available
+      if (isMiniapp) {
+        try {
+          const { sdk } = await import('@farcaster/miniapp-sdk');
+          const composeUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`;
+          await sdk.actions.openUrl(composeUrl);
+          return;
+        } catch (sdkError) {
+          console.log('Farcaster SDK not available, redirecting directly');
+        }
       }
-    } else {
+      
+      // Direct redirect to Warpcast compose
+      const composeUrl = `https://warpcast.com/~/compose?text=${encodeURIComponent(castText)}`;
+      window.open(composeUrl, '_blank');
+      
+    } catch (error) {
+      console.error('Failed to share:', error);
+      // Fallback to clipboard
       try {
-        await navigator.clipboard.writeText(`${text}\n\n${CORRECT_URL}`);
-        window.alert('Result copied to clipboard!');
-      } catch (error) {
+        await navigator.clipboard.writeText(castText);
+        alert('Cast text copied to clipboard! 📋 You can paste it in Warpcast.');
+      } catch (clipboardError) {
+        // Final fallback
         const textArea = document.createElement('textarea');
-        textArea.value = `${text}\n\n${CORRECT_URL}`;
+        textArea.value = castText;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        window.alert('Result copied to clipboard!');
+        alert('Cast text copied to clipboard! 📋 You can paste it in Warpcast.');
       }
     }
-  }, [totalTime]);
+  }, [totalTime, isMiniapp]);
 
   // Timer effect
   useEffect(() => {
