@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Preview Images</title>
+</head>
+<body>
+    <canvas id="ogCanvas" width="1200" height="630" style="border: 1px solid #ccc;"></canvas>
+    <br><br>
+    <canvas id="logoCanvas" width="512" height="512" style="border: 1px solid #ccc;"></canvas>
+    <br><br>
+    <button onclick="downloadImages()">Download Images</button>
+
+    <script>
+        // Create OG Image (1200x630)
+        const ogCanvas = document.getElementById('ogCanvas');
+        const ogCtx = ogCanvas.getContext('2d');
+        
+        // Create gradient background
+        const ogGradient = ogCtx.createLinearGradient(0, 0, 0, 630);
+        ogGradient.addColorStop(0, '#ff7043');
+        ogGradient.addColorStop(1, '#ff5722');
+        
+        ogCtx.fillStyle = ogGradient;
+        ogCtx.fillRect(0, 0, 1200, 630);
+        
+        // Add puzzle emoji
+        ogCtx.font = '72px Arial';
+        ogCtx.textAlign = 'center';
+        ogCtx.fillStyle = 'white';
+        ogCtx.fillText('🧩', 600, 200);
+        
+        // Add title
+        ogCtx.font = 'bold 48px Arial';
+        ogCtx.fillText('InflyncedPuzzle', 600, 320);
+        
+        // Add subtitle
+        ogCtx.font = '24px Arial';
+        ogCtx.fillText('Sliding Puzzle Game for Farcaster', 600, 400);
+        
+        // Add snowflakes
+        ogCtx.fillStyle = 'white';
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * 1200;
+            const y = Math.random() * 630;
+            const size = Math.random() * 4 + 2;
+            ogCtx.beginPath();
+            ogCtx.arc(x, y, size, 0, Math.PI * 2);
+            ogCtx.fill();
+        }
+        
+        // Create Logo Image (512x512)
+        const logoCanvas = document.getElementById('logoCanvas');
+        const logoCtx = logoCanvas.getContext('2d');
+        
+        // Create gradient background
+        const logoGradient = logoCtx.createLinearGradient(0, 0, 0, 512);
+        logoGradient.addColorStop(0, '#ff7043');
+        logoGradient.addColorStop(1, '#ff5722');
+        
+        logoCtx.fillStyle = logoGradient;
+        logoCtx.fillRect(0, 0, 512, 512);
+        
+        // Add puzzle emoji
+        logoCtx.font = '128px Arial';
+        logoCtx.textAlign = 'center';
+        logoCtx.fillStyle = 'white';
+        logoCtx.fillText('🧩', 256, 300);
+        
+        // Add border
+        logoCtx.strokeStyle = 'white';
+        logoCtx.lineWidth = 8;
+        logoCtx.strokeRect(4, 4, 504, 504);
+        
+        function downloadImages() {
+            // Download OG image
+            const ogLink = document.createElement('a');
+            ogLink.download = 'og-image.png';
+            ogLink.href = ogCanvas.toDataURL();
+            ogLink.click();
+            
+            // Download logo image
+            setTimeout(() => {
+                const logoLink = document.createElement('a');
+                logoLink.download = 'logo.png';
+                logoLink.href = logoCanvas.toDataURL();
+                logoLink.click();
+            }, 100);
+        }
+    </script>
+</body>
+</html>
