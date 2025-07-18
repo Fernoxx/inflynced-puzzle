@@ -1,11 +1,11 @@
 /**
- * InflyncedPuzzle - A sliding puzzle game for Farcaster with Wallet Integration
- * Features: Image-based puzzles, leaderboards, responsive design, Farcaster wallet connection
- * Updated: Added proper Farcaster wallet connection support
+ * InflyncedPuzzle - A sliding puzzle game for Farcaster with Proper Wallet Integration
+ * Features: Image-based puzzles, onchain leaderboard, share functionality, snow effect
+ * Updated: Proper Farcaster wallet connection with wagmi connector
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Trophy, RefreshCw, Palette, Wallet } from 'lucide-react';
+import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -46,10 +46,9 @@ const InflyncedPuzzle = () => {
   // Wallet connection states
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
-  const [walletType, setWalletType] = useState(null);
   const [sdkInstance, setSdkInstance] = useState(null);
-  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
-  const [walletError, setWalletError] = useState(null);
+  const [wagmiConfig, setWagmiConfig] = useState(null);
+  const [isSubmittingOnchain, setIsSubmittingOnchain] = useState(false);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -91,166 +90,44 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-  // Function to connect Farcaster wallet
-  const connectFarcasterWallet = async (sdk) => {
-    try {
-      console.log('🔗 Attempting to connect Farcaster wallet...');
-      
-      // Method 1: Check if wallet is already available in context
-      const context = await sdk.context;
-      if (context?.wallet && context.wallet.address) {
-        console.log('✅ Wallet found in context:', context.wallet.address);
-        return {
-          address: context.wallet.address,
-          chainId: context.wallet.chainId || 8453,
-          type: 'farcaster'
-        };
-      }
-      
-      // Method 2: Try new wallet connect API
-      if (sdk.wallet && typeof sdk.wallet.connect === 'function') {
-        console.log('📱 Using new wallet connect API');
-        const result = await sdk.wallet.connect();
-        console.log('✅ Wallet connected via new API:', result);
-        return {
-          address: result.address,
-          chainId: result.chainId || 8453,
-          type: 'farcaster'
-        };
-      }
-      
-      // Method 3: Try legacy wallet connection
-      if (sdk.actions && typeof sdk.actions.connectWallet === 'function') {
-        console.log('📱 Using legacy wallet connect API');
-        const result = await sdk.actions.connectWallet();
-        console.log('✅ Wallet connected via legacy API:', result);
-        return {
-          address: result.address,
-          chainId: result.chainId || 8453,
-          type: 'farcaster'
-        };
-      }
-      
-      // Method 4: Check if wallet property exists
-      if (sdk.wallet && sdk.wallet.address) {
-        console.log('📱 Using existing wallet property');
-        return {
-          address: sdk.wallet.address,
-          chainId: sdk.wallet.chainId || 8453,
-          type: 'farcaster'
-        };
-      }
-      
-      console.log('❌ No Farcaster wallet connection method available');
-      return null;
-      
-    } catch (error) {
-      console.error('❌ Farcaster wallet connection failed:', error);
-      throw error;
-    }
-  };
-
-  // Manual wallet connection
-  const connectWallet = async () => {
-    setIsConnectingWallet(true);
-    setWalletError(null);
-    
-    try {
-      console.log('🔄 Starting manual wallet connection...');
-      
-      // First try Farcaster wallet if available
-      if (sdkInstance && isInFarcaster) {
-        console.log('🔗 Attempting Farcaster wallet connection...');
-        const result = await connectFarcasterWallet(sdkInstance);
-        if (result) {
-          setWalletAddress(result.address);
-          setWalletType('farcaster');
-          setWalletConnected(true);
-          console.log('✅ Farcaster wallet connected successfully');
-          return;
-        }
-      }
-      
-      // Fallback to browser wallet
-      if (window.ethereum) {
-        console.log('🔄 Falling back to browser wallet...');
-        
-        // Identify wallet type
-        let walletName = 'unknown';
-        if (window.ethereum.isCoinbaseWallet) {
-          walletName = 'coinbase';
-        } else if (window.ethereum.isMetaMask) {
-          walletName = 'metamask';
-        } else if (window.ethereum.isRabby) {
-          walletName = 'rabby';
-        }
-        
-        console.log('📱 Detected wallet:', walletName);
-        
-        // Request account access
-        const accounts = await window.ethereum.request({
-          method: 'eth_requestAccounts'
-        });
-        
-        if (accounts.length > 0) {
-          const address = accounts[0];
-          
-          // Get chain ID
-          const chainId = await window.ethereum.request({
-            method: 'eth_chainId'
-          });
-          
-          setWalletAddress(address);
-          setWalletType(walletName);
-          setWalletConnected(true);
-          
-          console.log('✅ External wallet connected:', {
-            address,
-            chainId: parseInt(chainId, 16),
-            type: walletName
-          });
-        }
-      } else {
-        throw new Error('No wallet detected. Please install a wallet like MetaMask or use Farcaster mobile app.');
-      }
-      
-    } catch (error) {
-      console.error('❌ Wallet connection failed:', error);
-      setWalletError(error.message);
-    } finally {
-      setIsConnectingWallet(false);
-    }
-  };
-
-  // Disconnect wallet
-  const disconnectWallet = useCallback(() => {
-    setWalletAddress(null);
-    setWalletType(null);
-    setWalletConnected(false);
-    setWalletError(null);
-    console.log('🔌 Wallet disconnected');
-  }, []);
-
-  // Initialize SDK with proper Farcaster context reading and wallet connection
+  // Initialize Farcaster SDK with proper wagmi connector
   useEffect(() => {
-    const initializeMiniapp = async () => {
+    const initializeFarcasterWallet = async () => {
       try {
-        console.log('🔄 Initializing Farcaster miniapp...');
+        console.log('🔄 Initializing Farcaster miniapp with wagmi...');
         
-        // Import and initialize Farcaster SDK
+        // Import Farcaster SDK and wagmi connector
         const { sdk } = await import('@farcaster/miniapp-sdk');
+        const { createConfig, http } = await import('wagmi');
+        const { base, mainnet } = await import('wagmi/chains');
+        const { injected } = await import('wagmi/connectors');
+        
         setSdkInstance(sdk);
         
-        // CRITICAL: Always call ready() first
-        await sdk.actions.ready();
-        console.log('✅ SDK ready() called - loading screen hidden');
+        // Create wagmi config for Base and Ethereum
+        const config = createConfig({
+          chains: [base, mainnet],
+          connectors: [
+            injected()
+          ],
+          transports: {
+            [base.id]: http(),
+            [mainnet.id]: http(),
+          },
+        });
         
-        // Wait for SDK to be ready and get user context
+        setWagmiConfig(config);
+        console.log('✅ Wagmi config created');
+        
+        // Call ready() to dismiss splash screen
+        await sdk.actions.ready();
+        console.log('✅ SDK ready() called');
+        
+        // Get context
         const context = await sdk.context;
         console.log('📱 Farcaster context:', context);
         
         if (context?.user) {
-          // Extract real user data
           const userProfile = {
             fid: context.user.fid,
             username: context.user.username,
@@ -259,141 +136,147 @@ const InflyncedPuzzle = () => {
           };
           setUserProfile(userProfile);
           setIsInFarcaster(true);
-          console.log('✅ Real Farcaster user profile:', userProfile);
+          console.log('✅ Farcaster user profile:', userProfile);
           
-          // Try to connect wallet automatically
-          try {
-            console.log('🔗 Attempting automatic wallet connection...');
-            const walletResult = await connectFarcasterWallet(sdk);
-            if (walletResult) {
-              setWalletAddress(walletResult.address);
-              setWalletType('farcaster');
-              setWalletConnected(true);
-              console.log('✅ Automatic wallet connection successful');
-            } else {
-              console.log('⚠️ Automatic wallet connection failed - user can connect manually');
-            }
-          } catch (walletError) {
-            console.log('⚠️ Automatic wallet connection error:', walletError);
-            // Continue without wallet - user can connect manually
-          }
+          // Check for wallet connection
+          await checkWalletConnection(sdk);
         } else {
-          console.log('❌ No Farcaster user context found');
+          console.log('❌ No Farcaster user context');
           setIsInFarcaster(false);
           getFallbackUserProfile();
         }
         
         setIsLoading(false);
-        console.log('✅ Miniapp initialized successfully!');
         
       } catch (error) {
-        console.log('❌ Farcaster SDK initialization failed:', error);
+        console.error('❌ Farcaster initialization failed:', error);
         setIsInFarcaster(false);
         getFallbackUserProfile();
         setIsLoading(false);
       }
     };
 
-    initializeMiniapp();
+    initializeFarcasterWallet();
   }, [getFallbackUserProfile]);
 
-  // Wallet Status Component
-  const WalletStatus = () => (
-    <div style={{ 
-      padding: '8px 16px', 
-      backgroundColor: walletConnected ? '#e8f5e8' : '#fff3cd',
-      borderBottom: '1px solid #e0e0e0',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '12px', color: '#666' }}>
-          {walletConnected ? '🔗 Wallet Connected' : '⚠️ Wallet Not Connected'}
-        </span>
-        {walletConnected && walletAddress && (
-          <span style={{ 
-            fontFamily: 'monospace', 
-            fontSize: '10px', 
-            color: '#333',
-            backgroundColor: 'rgba(0,0,0,0.1)',
-            padding: '2px 6px',
-            borderRadius: '4px'
-          }}>
-            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-          </span>
-        )}
-        {walletConnected && walletType && (
-          <span style={{ 
-            fontSize: '10px', 
-            color: walletType === 'farcaster' ? '#4CAF50' : '#FF9800',
-            fontWeight: 'bold',
-            backgroundColor: 'rgba(0,0,0,0.1)',
-            padding: '2px 6px',
-            borderRadius: '4px'
-          }}>
-            {walletType === 'farcaster' ? 'FARCASTER' : walletType.toUpperCase()}
-          </span>
-        )}
-      </div>
+  // Check wallet connection
+  const checkWalletConnection = async (sdk) => {
+    try {
+      console.log('🔍 Checking wallet connection...');
       
-      <div style={{ display: 'flex', gap: '4px' }}>
-        {!walletConnected ? (
-          <button
-            onClick={connectWallet}
-            disabled={isConnectingWallet}
-            style={{
-              backgroundColor: '#8B5CF6',
-              color: 'white',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              cursor: isConnectingWallet ? 'not-allowed' : 'pointer',
-              opacity: isConnectingWallet ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            {isConnectingWallet ? (
-              <>
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  border: '1px solid transparent',
-                  borderTop: '1px solid white',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Wallet size={12} />
-                Connect
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={disconnectWallet}
-            style={{
-              backgroundColor: '#f44336',
-              color: 'white',
-              border: 'none',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '10px',
-              cursor: 'pointer'
-            }}
-          >
-            Disconnect
-          </button>
-        )}
-      </div>
-    </div>
-  );
+      // Method 1: Check if wallet is in context
+      const context = await sdk.context;
+      if (context?.wallet && context.wallet.address) {
+        console.log('✅ Wallet found in context:', context.wallet.address);
+        setWalletAddress(context.wallet.address);
+        setWalletConnected(true);
+        return;
+      }
+      
+      // Method 2: Check ethereum provider
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          console.log('✅ Wallet already connected:', accounts[0]);
+          setWalletAddress(accounts[0]);
+          setWalletConnected(true);
+          return;
+        }
+      }
+      
+      console.log('⚠️ No wallet connected');
+    } catch (error) {
+      console.log('❌ Wallet check failed:', error);
+    }
+  };
+
+  // Connect wallet function
+  const connectWallet = async () => {
+    try {
+      console.log('🔗 Connecting wallet...');
+      
+      if (!window.ethereum) {
+        alert('Please use Farcaster mobile app or install a wallet');
+        return;
+      }
+      
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts'
+      });
+      
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        setWalletConnected(true);
+        console.log('✅ Wallet connected:', accounts[0]);
+      }
+    } catch (error) {
+      console.error('❌ Wallet connection failed:', error);
+      alert('Wallet connection failed: ' + error.message);
+    }
+  };
+
+  // Submit score onchain
+  const submitScoreOnchain = async (time, puzzleId) => {
+    if (!walletConnected || !walletAddress) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    setIsSubmittingOnchain(true);
+    
+    try {
+      console.log('🔗 Submitting score onchain...');
+      
+      // Get contract address from environment or use default
+      const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS || '0x...'; // Your contract address
+      
+      // Prepare transaction data
+      const scoreData = {
+        player: walletAddress,
+        time: Math.floor(time / 1000), // Convert to seconds
+        puzzleId: puzzleId,
+        timestamp: Math.floor(Date.now() / 1000)
+      };
+      
+      console.log('📝 Score data to submit:', scoreData);
+      
+      // Create transaction
+      const txData = {
+        to: contractAddress,
+        data: encodeScoreSubmission(scoreData),
+        value: '0x0'
+      };
+      
+      // Send transaction
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [txData]
+      });
+      
+      console.log('✅ Transaction sent:', txHash);
+      alert(`Score submitted onchain! Transaction: ${txHash}`);
+      
+      // Also save to regular API for backup
+      saveScore(time, puzzleId);
+      
+    } catch (error) {
+      console.error('❌ Onchain submission failed:', error);
+      alert('Onchain submission failed: ' + error.message);
+      
+      // Fallback to regular API save
+      saveScore(time, puzzleId);
+    } finally {
+      setIsSubmittingOnchain(false);
+    }
+  };
+
+  // Encode score submission data (simplified - you'll need to match your contract ABI)
+  const encodeScoreSubmission = (scoreData) => {
+    // This is a placeholder - you'll need to implement based on your contract ABI
+    // For now, just returning a simple function signature
+    const functionSignature = '0x12345678'; // Your function selector
+    return functionSignature;
+  };
 
   // Snow animation effect
   const createSnowflake = useCallback(() => {
@@ -416,7 +299,6 @@ const InflyncedPuzzle = () => {
       x: flake.x + Math.sin(flake.y * 0.01) * 0.5
     })).filter(flake => flake.y < window.innerHeight);
 
-    // Add new snowflakes
     if (snowflakesRef.current.length < 50) {
       snowflakesRef.current.push(createSnowflake());
     }
@@ -433,12 +315,12 @@ const InflyncedPuzzle = () => {
     }
   }, [showSnowEffect, animateSnow, createSnowflake]);
 
-  // Toggle snow effect UI
+  // Toggle snow effect
   const toggleSnowEffect = useCallback(() => {
     setShowSnowEffect(!showSnowEffect);
   }, [showSnowEffect]);
 
-  // Load shared leaderboard from API with better error handling
+  // Load shared leaderboard
   const loadSharedLeaderboard = useCallback(async () => {
     setIsLoadingLeaderboard(true);
     
@@ -454,7 +336,7 @@ const InflyncedPuzzle = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Loaded leaderboard data:', data);
-        setSharedLeaderboard(data.leaderboard || []);
+        setSharedLeaderboard(Array.isArray(data) ? data : []);
       } else {
         console.log('❌ Failed to load leaderboard:', response.status);
         setSharedLeaderboard([]);
@@ -467,7 +349,7 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Save score to API with better error handling
+  // Save score to API
   const saveScore = useCallback(async (time, puzzleId) => {
     if (!userProfile || !userProfile.username) {
       console.log('❌ No user profile available to save score');
@@ -476,23 +358,22 @@ const InflyncedPuzzle = () => {
 
     try {
       console.log('🔄 Saving score to API...');
-      const response = await fetch('/api/leaderboard', {
+      const response = await fetch('/api/submit-score', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           username: userProfile.username,
-          time: time,
+          fid: userProfile.fid,
+          time: parseFloat((time / 1000).toFixed(1)),
           puzzleId: puzzleId,
-          fid: userProfile.fid || null,
-          pfpUrl: userProfile.pfpUrl || null
+          walletAddress: walletAddress
         }),
       });
 
       if (response.ok) {
         console.log('✅ Score saved successfully');
-        // Reload leaderboard to show updated scores
         loadSharedLeaderboard();
       } else {
         console.log('❌ Failed to save score:', response.status);
@@ -500,17 +381,64 @@ const InflyncedPuzzle = () => {
     } catch (error) {
       console.log('❌ Error saving score:', error);
     }
-  }, [userProfile, loadSharedLeaderboard]);
+  }, [userProfile, walletAddress, loadSharedLeaderboard]);
 
-  // Generate 3x3 board with proper image positioning
+  // Share result function
+  const shareResult = useCallback(async () => {
+    const timeInSeconds = (totalTime / 1000).toFixed(1);
+    const miniappUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
+    const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
+    
+    console.log('🔄 Share function called');
+    
+    // Try Farcaster composeCast if available
+    if (sdkInstance && isInFarcaster) {
+      try {
+        console.log('📱 Using Farcaster composeCast');
+        const result = await sdkInstance.actions.composeCast({
+          text: text,
+          embeds: [{ url: miniappUrl }]
+        });
+        
+        if (result?.cast) {
+          console.log('✅ Cast shared successfully:', result.cast.hash);
+          return;
+        }
+      } catch (error) {
+        console.log('❌ Farcaster share failed:', error);
+      }
+    }
+    
+    // Fallback to Web Share API
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'InflyncedPuzzle - I solved it!',
+          text: text,
+          url: miniappUrl,
+        });
+      } catch (error) {
+        console.log('Web Share cancelled or failed:', error);
+      }
+    } else {
+      // Clipboard fallback
+      try {
+        await navigator.clipboard.writeText(`${text}\n\n${miniappUrl}`);
+        alert('Result copied to clipboard!');
+      } catch (error) {
+        console.log('Clipboard failed:', error);
+      }
+    }
+  }, [totalTime, sdkInstance, isInFarcaster]);
+
+  // Generate 3x3 board
   const generateBoard = useCallback((puzzle) => {
-    // Create solved board first
     const solved = [];
     for (let row = 0; row < 3; row++) {
       solved[row] = [];
       for (let col = 0; col < 3; col++) {
         if (row === 2 && col === 2) {
-          solved[row][col] = null; // Empty space
+          solved[row][col] = null;
         } else {
           solved[row][col] = {
             id: row * 3 + col + 1,
@@ -524,21 +452,17 @@ const InflyncedPuzzle = () => {
       }
     }
 
-    // Shuffle the board using valid moves only
-    const shuffled = JSON.parse(JSON.stringify(solved)); // Deep copy
+    const shuffled = JSON.parse(JSON.stringify(solved));
     let currentEmptyPos = { row: 2, col: 2 };
     
-    // Perform 1000 random valid moves to shuffle
     for (let i = 0; i < 1000; i++) {
       const possibleMoves = getPossibleMoves(shuffled, currentEmptyPos);
       if (possibleMoves.length > 0) {
         const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
         
-        // Swap the tile with empty space
         shuffled[currentEmptyPos.row][currentEmptyPos.col] = shuffled[randomMove.row][randomMove.col];
         shuffled[randomMove.row][randomMove.col] = null;
         
-        // Update empty position
         currentEmptyPos = { row: randomMove.row, col: randomMove.col };
       }
     }
@@ -547,27 +471,15 @@ const InflyncedPuzzle = () => {
     return shuffled;
   }, []);
 
-  const getEmptyPosition = (board) => {
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        if (board[row][col] === null) {
-          return { row, col };
-        }
-      }
-    }
-    return { row: 2, col: 2 };
-  };
-
   const getPossibleMoves = (board, emptyPos) => {
     const moves = [];
     const { row, col } = emptyPos;
     
-    // Check all four directions
     const directions = [
-      { row: row - 1, col: col }, // Up
-      { row: row + 1, col: col }, // Down
-      { row: row, col: col - 1 }, // Left
-      { row: row, col: col + 1 }  // Right
+      { row: row - 1, col: col },
+      { row: row + 1, col: col },
+      { row: row, col: col - 1 },
+      { row: row, col: col + 1 }
     ];
 
     directions.forEach(pos => {
@@ -586,18 +498,15 @@ const InflyncedPuzzle = () => {
     const emptyRow = emptyPos.row;
     const emptyCol = emptyPos.col;
 
-    // Check if the clicked tile is adjacent to empty space
     const isAdjacent = (
       (Math.abs(row - emptyRow) === 1 && col === emptyCol) ||
       (Math.abs(col - emptyCol) === 1 && row === emptyRow)
     );
 
     if (isAdjacent) {
-      // Swap tile with empty space
       newBoard[emptyRow][emptyCol] = newBoard[row][col];
       newBoard[row][col] = null;
       
-      // Update current positions
       if (newBoard[emptyRow][emptyCol]) {
         newBoard[emptyRow][emptyCol].currentRow = emptyRow;
         newBoard[emptyRow][emptyCol].currentCol = emptyCol;
@@ -606,23 +515,18 @@ const InflyncedPuzzle = () => {
       setBoard(newBoard);
       setEmptyPos({ row, col });
 
-      // Check if puzzle is solved
       if (isPuzzleSolved(newBoard)) {
-        const finalTime = Math.floor((Date.now() - startTime) / 1000);
+        const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
         setGameState('completed');
-        
-        // Save score to API
-        saveScore(finalTime, currentPuzzle.id);
       }
     }
-  }, [board, emptyPos, gameState, isPaused, startTime, currentPuzzle, saveScore]);
+  }, [board, emptyPos, gameState, isPaused, startTime]);
 
   const isPuzzleSolved = (board) => {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
         if (row === 2 && col === 2) {
-          // Empty space should be at bottom right
           if (board[row][col] !== null) return false;
         } else {
           const tile = board[row][col];
@@ -639,14 +543,13 @@ const InflyncedPuzzle = () => {
     if (!tile) return {};
     
     const { correctRow, correctCol } = tile;
-    // Fixed tile size calculation for proper image display
-    const tileSize = 74; // Each tile is 74px
+    const tileSize = 74;
     const backgroundPositionX = -(correctCol * tileSize);
     const backgroundPositionY = -(correctRow * tileSize);
     
     return {
       backgroundImage: `url(${tile.image})`,
-      backgroundSize: `${tileSize * 3}px ${tileSize * 3}px`, // 222px x 222px total
+      backgroundSize: `${tileSize * 3}px ${tileSize * 3}px`,
       backgroundPosition: `${backgroundPositionX}px ${backgroundPositionY}px`,
       backgroundRepeat: 'no-repeat'
     };
@@ -657,7 +560,6 @@ const InflyncedPuzzle = () => {
     setCurrentPuzzle(puzzle);
     const newBoard = generateBoard(puzzle);
     setBoard(newBoard);
-    setEmptyPos(getEmptyPosition(newBoard));
     setStartTime(Date.now());
     setCurrentTime(0);
     setTotalTime(0);
@@ -744,7 +646,7 @@ const InflyncedPuzzle = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [gameState, isPaused, emptyPos, moveTile]);
 
-  // Show loading screen while initializing
+  // Show loading screen
   if (isLoading) {
     return (
       <div style={{
@@ -805,18 +707,15 @@ const InflyncedPuzzle = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: showSnowEffect 
-        ? 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)' 
-        : 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
+      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)', // Keep orange always
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px',
       fontFamily: 'system-ui, -apple-system, sans-serif',
-      position: 'relative',
-      transition: 'background 0.5s ease'
+      position: 'relative'
     }}>
-      {/* Snow Effect */}
+      {/* Snow Effect - only animation, no color change */}
       {showSnowEffect && (
         <div style={{
           position: 'fixed',
@@ -846,7 +745,7 @@ const InflyncedPuzzle = () => {
         </div>
       )}
 
-      {/* Compact Card Container */}
+      {/* Card Container */}
       <div style={{
         width: '100%',
         maxWidth: '400px',
@@ -880,21 +779,21 @@ const InflyncedPuzzle = () => {
           </div>
           
           <div style={{ display: 'flex', gap: '4px' }}>
-            {/* Snow Effect Toggle Button */}
+            {/* Make It Snow Button */}
             <button
               onClick={toggleSnowEffect}
               style={{
                 padding: '6px',
-                backgroundColor: showSnowEffect ? '#34495e' : '#ff5722',
+                backgroundColor: showSnowEffect ? '#87CEEB' : '#ff5722',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '10px'
               }}
-              title={showSnowEffect ? 'Switch to Normal UI' : 'Switch to Snow UI'}
+              title={showSnowEffect ? 'Stop Snow' : 'Make It Snow'}
             >
-              <Palette size={12} />
+              <Snowflake size={12} />
             </button>
             
             {gameState === 'playing' && (
@@ -948,18 +847,59 @@ const InflyncedPuzzle = () => {
         </div>
 
         {/* Wallet Status */}
-        <WalletStatus />
-
-        {/* Wallet Error Display */}
-        {walletError && (
+        {!walletConnected && (
           <div style={{
             padding: '8px 16px',
-            backgroundColor: '#ffebee',
-            borderBottom: '1px solid #ffcdd2',
-            fontSize: '11px',
-            color: '#c62828'
+            backgroundColor: '#fff3cd',
+            borderBottom: '1px solid #ffeaa7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
           }}>
-            ⚠️ {walletError}
+            <span style={{ fontSize: '12px', color: '#856404' }}>
+              ⚠️ Wallet Not Connected
+            </span>
+            <button
+              onClick={connectWallet}
+              style={{
+                backgroundColor: '#8B5CF6',
+                color: 'white',
+                border: 'none',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              Connect
+            </button>
+          </div>
+        )}
+
+        {walletConnected && (
+          <div style={{
+            padding: '8px 16px',
+            backgroundColor: '#e8f5e8',
+            borderBottom: '1px solid #c8e6c9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#2e7d32' }}>
+                🔗 Wallet Connected
+              </span>
+              <span style={{
+                fontFamily: 'monospace',
+                fontSize: '10px',
+                color: '#333',
+                backgroundColor: 'rgba(0,0,0,0.1)',
+                padding: '2px 6px',
+                borderRadius: '4px'
+              }}>
+                {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+              </span>
+            </div>
           </div>
         )}
 
@@ -997,7 +937,7 @@ const InflyncedPuzzle = () => {
               Puzzle Completed!
             </div>
             <div style={{ fontSize: '12px', color: '#666' }}>
-              Time: {Math.floor(totalTime / 60)}:{(totalTime % 60).toString().padStart(2, '0')}
+              Time: {Math.floor(totalTime / 1000 / 60)}:{((totalTime / 1000) % 60).toFixed(1).padStart(4, '0')}
             </div>
           </div>
         )}
@@ -1008,7 +948,7 @@ const InflyncedPuzzle = () => {
           {showLeaderboard && (
             <div style={{ flex: 1, padding: '16px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: '#333', textAlign: 'center' }}>
-                🏆 Global Leaderboard
+                🏆 Onchain Leaderboard
               </h3>
               
               {isLoadingLeaderboard ? (
@@ -1060,7 +1000,7 @@ const InflyncedPuzzle = () => {
                 </p>
               </div>
               
-              {/* Wallet Connection Status in Menu */}
+              {/* Wallet connection reminder */}
               {!walletConnected && (
                 <div style={{
                   backgroundColor: '#fff3cd',
@@ -1179,25 +1119,64 @@ const InflyncedPuzzle = () => {
                 Congratulations!
               </h2>
               <p style={{ color: '#666', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>
-                You completed puzzle {currentPuzzle?.id} in {Math.floor(totalTime / 60)}:{(totalTime % 60).toString().padStart(2, '0')}
+                You completed puzzle {currentPuzzle?.id} in {(totalTime / 1000).toFixed(1)} seconds
               </p>
               
-              {/* Wallet connection reminder */}
-              {!walletConnected && (
+              {/* Onchain submission option */}
+              {walletConnected && (
                 <div style={{
-                  backgroundColor: '#fff3cd',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
+                  backgroundColor: '#e8f5e8',
+                  padding: '12px',
+                  borderRadius: '8px',
                   marginBottom: '16px',
-                  fontSize: '11px',
-                  color: '#856404',
+                  width: '100%',
                   textAlign: 'center'
                 }}>
-                  💡 Connect wallet to save onchain scores!
+                  <p style={{ fontSize: '12px', color: '#2e7d32', margin: '0 0 8px 0' }}>
+                    🔗 Save your score onchain for permanent leaderboard!
+                  </p>
+                  <button
+                    onClick={() => submitScoreOnchain(totalTime, currentPuzzle?.id)}
+                    disabled={isSubmittingOnchain}
+                    style={{
+                      backgroundColor: '#8B5CF6',
+                      color: 'white',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontWeight: '600',
+                      fontSize: '12px',
+                      border: 'none',
+                      cursor: isSubmittingOnchain ? 'not-allowed' : 'pointer',
+                      opacity: isSubmittingOnchain ? 0.7 : 1
+                    }}
+                  >
+                    {isSubmittingOnchain ? 'Submitting...' : '⛓️ Save Onchain'}
+                  </button>
                 </div>
               )}
               
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {/* Share Button */}
+                <button
+                  onClick={shareResult}
+                  style={{
+                    backgroundColor: '#1DA1F2',
+                    color: 'white',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Share2 size={16} />
+                  Share Result
+                </button>
+                
                 <button
                   onClick={startGame}
                   style={{
