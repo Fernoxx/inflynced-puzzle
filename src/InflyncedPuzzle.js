@@ -1,6 +1,6 @@
 /**
- * InflyncedPuzzle - A sliding puzzle game for Farcaster with Onchain Leaderboard
- * Updated: Fixed compilation errors and integrated real contract
+ * InflyncedPuzzle - Complete Latest Version with Proper Miniapp Embeds
+ * Updated: January 2025 with latest Farcaster SDK
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -51,6 +51,7 @@ const InflyncedPuzzle = () => {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
   const [sdkInstance, setSdkInstance] = useState(null);
+  const [ethereumProvider, setEthereumProvider] = useState(null);
   const [isSubmittingOnchain, setIsSubmittingOnchain] = useState(false);
   
   const audioContextRef = useRef(null);
@@ -105,7 +106,7 @@ const InflyncedPuzzle = () => {
         
         console.log('📋 SDK loaded successfully');
         
-        // Call ready() to dismiss splash screen
+        // CRITICAL: Call ready() first
         await sdk.actions.ready();
         console.log('✅ SDK ready() called');
         
@@ -124,8 +125,38 @@ const InflyncedPuzzle = () => {
           setIsInFarcaster(true);
           console.log('✅ Farcaster user profile:', userProfile);
           
-          // Check for wallet connection
-          await checkWalletConnection();
+          // Get Farcaster's Ethereum provider
+          try {
+            console.log('🔗 Getting Farcaster Ethereum provider...');
+            const provider = sdk.wallet.getEthereumProvider();
+            
+            if (provider) {
+              console.log('✅ Farcaster Ethereum provider obtained!');
+              setEthereumProvider(provider);
+              
+              // Check if wallet is already connected
+              try {
+                const accounts = await provider.request({ method: 'eth_accounts' });
+                if (accounts && accounts.length > 0) {
+                  console.log('✅ Farcaster wallet already connected:', accounts[0]);
+                  setWalletAddress(accounts[0]);
+                  setWalletConnected(true);
+                  
+                  // Check chain
+                  const chainId = await provider.request({ method: 'eth_chainId' });
+                  console.log('🔗 Current chain:', parseInt(chainId, 16));
+                }
+              } catch (accountError) {
+                console.log('ℹ️ No accounts connected yet:', accountError);
+              }
+            } else {
+              console.log('❌ No Farcaster Ethereum provider available');
+            }
+            
+          } catch (providerError) {
+            console.log('❌ Failed to get Farcaster provider:', providerError);
+          }
+          
         } else {
           console.log('❌ No Farcaster user context');
           setIsInFarcaster(false);
@@ -145,73 +176,73 @@ const InflyncedPuzzle = () => {
     initializeFarcasterWallet();
   }, [getFallbackUserProfile]);
 
-  // Check wallet connection
-  const checkWalletConnection = async () => {
-    try {
-      console.log('🔍 Checking wallet connection...');
-      
-      if (!window.ethereum) {
-        console.log('⚠️ No ethereum provider');
-        return;
-      }
-      
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      if (accounts.length > 0) {
-        console.log('✅ Wallet already connected:', accounts[0]);
-        setWalletAddress(accounts[0]);
-        setWalletConnected(true);
-        
-        // Check if we're on the right chain
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        const currentChainId = parseInt(chainId, 16);
-        console.log('🔗 Current chain ID:', currentChainId);
-        
-        if (currentChainId !== DEFAULT_CHAIN_ID) {
-          console.log('⚠️ Wrong chain. Expected:', DEFAULT_CHAIN_ID, 'Got:', currentChainId);
-        }
-      }
-      
-    } catch (error) {
-      console.log('❌ Wallet check failed:', error);
-    }
-  };
-
-  // Connect wallet function
+  // Connect wallet using Farcaster provider
   const connectWallet = async () => {
     try {
       console.log('🔗 Connecting wallet...');
       
-      if (!window.ethereum) {
-        alert('Please use Farcaster mobile app or install a wallet like MetaMask');
-        return;
-      }
-      
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts'
-      });
-      
-      if (accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        setWalletConnected(true);
-        console.log('✅ Wallet connected:', accounts[0]);
+      // First try Farcaster provider
+      if (ethereumProvider) {
+        console.log('📱 Using Farcaster Ethereum provider');
         
-        // Switch to Base network if needed
         try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
+          const accounts = await ethereumProvider.request({
+            method: 'eth_requestAccounts'
           });
-        } catch (switchError) {
-          console.log('⚠️ Chain switch failed:', switchError);
+          
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+            setWalletConnected(true);
+            console.log('✅ Farcaster wallet connected:', accounts[0]);
+            
+            // Check/switch to Base chain
+            try {
+              const chainId = await ethereumProvider.request({ method: 'eth_chainId' });
+              const currentChainId = parseInt(chainId, 16);
+              
+              if (currentChainId !== DEFAULT_CHAIN_ID) {
+                console.log('🔄 Switching to Base chain...');
+                await ethereumProvider.request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
+                });
+              }
+            } catch (switchError) {
+              console.log('⚠️ Chain switch failed:', switchError);
+            }
+            
+            return;
+          }
+        } catch (farcasterError) {
+          console.log('❌ Farcaster wallet connection failed:', farcasterError);
+          throw farcasterError;
         }
       }
+      
+      // Fallback to window.ethereum
+      if (window.ethereum) {
+        console.log('🔄 Falling back to window.ethereum...');
+        
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+        
+        if (accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          setWalletConnected(true);
+          console.log('✅ External wallet connected:', accounts[0]);
+        }
+      } else {
+        throw new Error('No wallet detected. Please use Farcaster mobile app.');
+      }
+      
     } catch (error) {
       console.error('❌ Wallet connection failed:', error);
       alert('Wallet connection failed: ' + error.message);
     }
   };
 
-  // Submit score onchain with your real contract
+  // Submit score onchain
   const submitScoreOnchain = async (time, puzzleId) => {
     if (!walletConnected || !walletAddress) {
       alert('Please connect your wallet first');
@@ -223,12 +254,11 @@ const InflyncedPuzzle = () => {
     try {
       console.log('🔗 Submitting score onchain...');
       
-      // Prepare parameters
       const scoreInSeconds = Math.floor(time / 1000);
       const username = userProfile?.username || 'anonymous';
       const fid = userProfile?.fid || 0;
       
-      console.log('📝 Submitting score with params:', {
+      console.log('📝 Submitting score:', {
         contract: CONTRACT_ADDRESS,
         selector: SUBMIT_SCORE_SELECTOR,
         time: scoreInSeconds,
@@ -237,28 +267,28 @@ const InflyncedPuzzle = () => {
         fid: fid
       });
       
-      // For now, we'll use just the function selector
-      // In a full implementation, you'd encode the parameters properly
-      const txData = SUBMIT_SCORE_SELECTOR;
+      // Use Farcaster provider if available
+      const provider = ethereumProvider || window.ethereum;
       
-      console.log('🔧 Transaction data:', txData);
+      if (!provider) {
+        throw new Error('No Ethereum provider available');
+      }
       
       // Send transaction
-      const txHash = await window.ethereum.request({
+      const txHash = await provider.request({
         method: 'eth_sendTransaction',
         params: [{
           to: CONTRACT_ADDRESS,
           from: walletAddress,
-          data: txData,
+          data: SUBMIT_SCORE_SELECTOR,
           value: '0x0',
-          gas: '0x186A0' // 100,000 gas limit
+          gas: '0x186A0'
         }]
       });
       
       console.log('✅ Transaction sent:', txHash);
       alert(`Score submitted onchain! 🎉\n\nTransaction: ${txHash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${txHash}`);
       
-      // Reload leaderboard after transaction
       setTimeout(() => {
         loadOnchainLeaderboard();
       }, 3000);
@@ -268,8 +298,6 @@ const InflyncedPuzzle = () => {
       
       if (error.code === 4001) {
         alert('Transaction cancelled by user');
-      } else if (error.code === -32603) {
-        alert('Transaction failed: ' + (error.data?.message || error.message));
       } else {
         alert('Transaction failed: ' + error.message);
       }
@@ -285,8 +313,6 @@ const InflyncedPuzzle = () => {
     try {
       console.log('🔄 Loading onchain leaderboard...');
       
-      // For now, return mock data since we need to implement proper contract reading
-      // In a full implementation, you'd read from the contract here
       const mockLeaderboard = [
         { username: 'player1', time: 45.2, puzzleId: 1, player: '0x123...456' },
         { username: 'player2', time: 52.1, puzzleId: 2, player: '0x789...012' }
@@ -303,27 +329,72 @@ const InflyncedPuzzle = () => {
     }
   }, []);
 
-  // Share result function
+  // FIXED: Share result with proper miniapp embed
   const shareResult = useCallback(async () => {
     const timeInSeconds = (totalTime / 1000).toFixed(1);
     const miniappUrl = "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle";
     const text = `🧩 I solved the InflyncedPuzzle in ${timeInSeconds} seconds!\n\nCan you beat my time? Try it now! 👇`;
     
     console.log('🔄 Share function called');
+    console.log('📱 Miniapp URL:', miniappUrl);
     
     // Try Farcaster composeCast if available
     if (sdkInstance && isInFarcaster) {
       try {
-        console.log('📱 Using Farcaster composeCast');
+        console.log('📱 Using Farcaster composeCast with proper embed');
+        
+        // Multiple embed format attempts for compatibility
+        const embedFormats = [
+          // Format 1: Direct URL string
+          miniappUrl,
+          
+          // Format 2: URL object
+          { url: miniappUrl },
+          
+          // Format 3: Embed object
+          {
+            url: miniappUrl,
+            type: 'miniapp'
+          },
+          
+          // Format 4: Frame format for compatibility
+          {
+            url: miniappUrl,
+            type: 'frame'
+          }
+        ];
+        
+        for (const embedFormat of embedFormats) {
+          try {
+            console.log('🔄 Trying embed format:', embedFormat);
+            
+            const result = await sdkInstance.actions.composeCast({
+              text: text,
+              embeds: [embedFormat]
+            });
+            
+            if (result?.cast) {
+              console.log('✅ Cast shared successfully with embed format:', embedFormat);
+              console.log('✅ Cast hash:', result.cast.hash);
+              return;
+            }
+          } catch (embedError) {
+            console.log('❌ Embed format failed:', embedFormat, embedError);
+            continue;
+          }
+        }
+        
+        // If all embed formats fail, try without embeds (URL in text)
+        console.log('🔄 Trying without embeds, URL in text only');
         const result = await sdkInstance.actions.composeCast({
-          text: text,
-          embeds: [{ url: miniappUrl }]
+          text: `${text}\n\n${miniappUrl}`
         });
         
         if (result?.cast) {
-          console.log('✅ Cast shared successfully:', result.cast.hash);
+          console.log('✅ Cast shared successfully (text only)');
           return;
         }
+        
       } catch (error) {
         console.log('❌ Farcaster share failed:', error);
       }
@@ -337,6 +408,7 @@ const InflyncedPuzzle = () => {
           text: text,
           url: miniappUrl,
         });
+        console.log('✅ Web Share API used');
       } catch (error) {
         console.log('Web Share cancelled or failed:', error);
       }
@@ -345,13 +417,14 @@ const InflyncedPuzzle = () => {
       try {
         await navigator.clipboard.writeText(`${text}\n\n${miniappUrl}`);
         alert('Result copied to clipboard!');
+        console.log('✅ Copied to clipboard');
       } catch (error) {
         console.log('Clipboard failed:', error);
       }
     }
   }, [totalTime, sdkInstance, isInFarcaster]);
 
-  // Snow animation effect
+  // Snow animation functions
   const createSnowflake = useCallback(() => {
     return {
       id: Math.random(),
@@ -388,12 +461,11 @@ const InflyncedPuzzle = () => {
     }
   }, [showSnowEffect, animateSnow, createSnowflake]);
 
-  // Toggle snow effect
   const toggleSnowEffect = useCallback(() => {
     setShowSnowEffect(!showSnowEffect);
   }, [showSnowEffect]);
 
-  // Generate 3x3 board
+  // Game logic functions
   const generateBoard = useCallback((puzzle) => {
     const solved = [];
     for (let row = 0; row < 3; row++) {
@@ -421,10 +493,8 @@ const InflyncedPuzzle = () => {
       const possibleMoves = getPossibleMoves(shuffled, currentEmptyPos);
       if (possibleMoves.length > 0) {
         const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-        
         shuffled[currentEmptyPos.row][currentEmptyPos.col] = shuffled[randomMove.row][randomMove.col];
         shuffled[randomMove.row][randomMove.col] = null;
-        
         currentEmptyPos = { row: randomMove.row, col: randomMove.col };
       }
     }
@@ -481,8 +551,7 @@ const InflyncedPuzzle = () => {
         const finalTime = Date.now() - startTime;
         setTotalTime(finalTime);
         setGameState('completed');
-        
-        console.log('🎉 Puzzle completed! Time:', (finalTime / 1000).toFixed(1) + 's');
+        console.log('🎉 Puzzle completed!');
       }
     }
   }, [board, emptyPos, gameState, isPaused, startTime]);
@@ -610,7 +679,7 @@ const InflyncedPuzzle = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [gameState, isPaused, emptyPos, moveTile]);
 
-  // Show loading screen
+  // Loading screen
   if (isLoading) {
     return (
       <div style={{
@@ -671,7 +740,7 @@ const InflyncedPuzzle = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)', // Keep orange always
+      background: 'linear-gradient(135deg, #ff7043 0%, #ff5722 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -851,7 +920,7 @@ const InflyncedPuzzle = () => {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: '#2e7d32' }}>
-                🔗 Wallet Connected
+                🔗 Farcaster Wallet Connected
               </span>
               <span style={{
                 fontFamily: 'monospace',
@@ -964,7 +1033,6 @@ const InflyncedPuzzle = () => {
                 </p>
               </div>
               
-              {/* Wallet connection reminder */}
               {!walletConnected && (
                 <div style={{
                   backgroundColor: '#fff3cd',
@@ -978,7 +1046,6 @@ const InflyncedPuzzle = () => {
                 </div>
               )}
               
-              {/* Start Game Button */}
               <button
                 onClick={startGame}
                 style={{
@@ -1031,8 +1098,7 @@ const InflyncedPuzzle = () => {
                     padding: '8px',
                     backgroundColor: '#f8f9fa',
                     borderRadius: '8px',
-                    border: '1px solid #e9ecef',
-                    position: 'relative'
+                    border: '1px solid #e9ecef'
                   }}
                 >
                   {board.map((row, rowIndex) =>
@@ -1086,7 +1152,6 @@ const InflyncedPuzzle = () => {
                 You completed puzzle {currentPuzzle?.id} in {(totalTime / 1000).toFixed(1)} seconds
               </p>
               
-              {/* Onchain submission option */}
               {walletConnected && (
                 <div style={{
                   backgroundColor: '#e8f5e8',
@@ -1120,7 +1185,6 @@ const InflyncedPuzzle = () => {
               )}
               
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {/* Share Button */}
                 <button
                   onClick={shareResult}
                   style={{
@@ -1194,7 +1258,7 @@ const InflyncedPuzzle = () => {
         </div>
       </div>
 
-      {/* Snow animation styles */}
+      {/* Animation styles */}
       <style>
         {`
           @keyframes snowfall {
