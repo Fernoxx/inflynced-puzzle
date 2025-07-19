@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { ethers } from 'ethers';
 import { useAccount, useConnect, useWriteContract, usePublicClient } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
@@ -209,8 +208,16 @@ const InflyncedPuzzle = () => {
       console.log('🔗 Submitting score onchain...');
       
       const scoreInSeconds = Math.floor(time / 1000);
-      const username = userProfile?.username || 'anonymous';
+      const username = userProfile?.username || userProfile?.displayName || 'anonymous';
       const fid = userProfile?.fid || 0;
+      
+      // Validate required data
+      if (!scoreInSeconds || scoreInSeconds <= 0) {
+        throw new Error('Invalid score time');
+      }
+      if (!puzzleId || puzzleId <= 0) {
+        throw new Error('Invalid puzzle ID');
+      }
       
       console.log('📝 Submitting score:', {
         contract: CONTRACT_ADDRESS,
@@ -243,6 +250,18 @@ const InflyncedPuzzle = () => {
       // Use wagmi writeContract for better error handling and UX
       console.log('📝 Submitting contract write transaction...');
       
+      // Ensure all parameters are properly formatted
+      const safeUsername = username ? username.toString().slice(0, 31) : 'anonymous';
+      const safeFid = fid ? Number(fid) : 0;
+      
+      console.log('📝 Transaction parameters:', {
+        scoreInSeconds,
+        puzzleId,
+        safeUsername,
+        safeFid,
+        contractAddress: CONTRACT_ADDRESS
+      });
+
       const txHash = await writeContract({
         address: CONTRACT_ADDRESS,
         abi: [
@@ -261,15 +280,23 @@ const InflyncedPuzzle = () => {
         ],
         functionName: 'submitScore',
         args: [
-          ethers.BigNumber.from(scoreInSeconds), 
-          ethers.BigNumber.from(puzzleId), 
-          username.slice(0, 31), 
-          ethers.BigNumber.from(fid)
+          // eslint-disable-next-line no-undef
+          BigInt(scoreInSeconds), 
+          // eslint-disable-next-line no-undef
+          BigInt(puzzleId), 
+          safeUsername, 
+          // eslint-disable-next-line no-undef
+          BigInt(safeFid)
         ]
       });
       
       console.log('✅ Transaction sent:', txHash);
-      alert(`Score submitted onchain! 🎉\n\nTransaction: ${txHash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${txHash}`);
+      
+      // Safely handle transaction hash display
+      const displayHash = txHash && typeof txHash === 'string' ? txHash : 'Transaction submitted';
+      const shortHash = displayHash.length > 10 ? displayHash.slice(0, 10) + '...' : displayHash;
+      
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${shortHash}\n\nView on Basescan: https://basescan.org/tx/${displayHash}`);
       
       // Wait a bit then reload leaderboard
       setTimeout(() => {
@@ -278,13 +305,23 @@ const InflyncedPuzzle = () => {
       
     } catch (error) {
       console.error('❌ Onchain submission failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        data: error.data,
+        stack: error.stack
+      });
       
       if (error.code === 4001) {
         alert('Transaction cancelled by user');
       } else if (error.code === -32602) {
         alert('Invalid transaction parameters. Please check contract address and function selector.');
+      } else if (error.message.includes('slice')) {
+        alert('Parameter formatting error. Please try again.');
+      } else if (error.message.includes('revert')) {
+        alert('Transaction reverted. The contract may not exist or function is incorrect.');
       } else {
-        alert('Transaction failed: ' + error.message);
+        alert(`Transaction failed: ${error.message || 'Unknown error'}`);
       }
     } finally {
       setIsSubmittingOnchain(false);
@@ -324,17 +361,8 @@ const InflyncedPuzzle = () => {
         }
       }
       
-      // Mock leaderboard data (replace with actual blockchain parsing when contract is ready)
-      const mockLeaderboard = [
-        { username: 'crypto_solver', time: 42.5, puzzleId: 8, player: '0xabc...def', txHash: '0x123...456' },
-        { username: 'puzzle_master', time: 48.1, puzzleId: 5, player: '0x456...789', txHash: '0x789...012' },
-        { username: 'speed_runner', time: 51.8, puzzleId: 12, player: '0x789...abc', txHash: '0xdef...345' },
-        { username: 'brain_teaser', time: 56.3, puzzleId: 3, player: '0xdef...123', txHash: '0x678...901' },
-        { username: 'puzzle_fan', time: 62.7, puzzleId: 15, player: '0x234...567', txHash: '0x234...567' }
-      ];
-      
-      // Sort by time (fastest first)
-      leaderboardData = mockLeaderboard.sort((a, b) => a.time - b.time);
+              // Only show real onchain data - no mock/demo data
+        // leaderboardData remains empty array if no real onchain data
       
       setSharedLeaderboard(leaderboardData);
       console.log('✅ Leaderboard loaded with', leaderboardData.length, 'entries');
@@ -1094,7 +1122,10 @@ const InflyncedPuzzle = () => {
                 <div style={{ textAlign: 'center', padding: '20px 0', color: '#666', fontSize: '12px' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏆</div>
                   <div style={{ fontWeight: '600', marginBottom: '4px' }}>No onchain scores yet!</div>
-                  <div style={{ fontSize: '10px' }}>Be the first to submit a score to the blockchain</div>
+                  <div style={{ fontSize: '10px', marginBottom: '8px' }}>Be the first to submit a score to the blockchain</div>
+                  <div style={{ fontSize: '10px', color: '#999' }}>
+                    {walletConnected ? 'Complete a puzzle to submit your score!' : 'Connect wallet to save scores onchain'}
+                  </div>
                 </div>
               )}
             </div>
