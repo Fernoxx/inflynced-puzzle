@@ -130,29 +130,41 @@ const InflyncedPuzzle = () => {
           // Get Farcaster's Ethereum provider
           try {
             console.log('🔗 Getting Farcaster Ethereum provider...');
+            
+            // Wait a bit for SDK to fully initialize
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
             const provider = sdk.wallet.getEthereumProvider();
             
-            if (provider) {
-              console.log('✅ Farcaster Ethereum provider obtained!');
+            if (provider && typeof provider === 'object') {
+              console.log('✅ Farcaster Ethereum provider obtained!', typeof provider);
+              console.log('🔍 Provider methods:', Object.keys(provider));
               setEthereumProvider(provider);
               
-              // Check if wallet is already connected
-              try {
-                const accounts = await provider.request({ method: 'eth_accounts' });
-                if (accounts && accounts.length > 0) {
-                  console.log('✅ Farcaster wallet already connected:', accounts[0]);
-                  setWalletAddress(accounts[0]);
-                  setWalletConnected(true);
-                  
-                  // Check chain
-                  const chainId = await provider.request({ method: 'eth_chainId' });
-                  console.log('🔗 Current chain:', parseInt(chainId, 16));
+              // Validate provider has required methods
+              if (typeof provider.request === 'function') {
+                console.log('✅ Provider has request method');
+                
+                // Check if wallet is already connected
+                try {
+                  const accounts = await provider.request({ method: 'eth_accounts' });
+                  if (accounts && accounts.length > 0) {
+                    console.log('✅ Farcaster wallet already connected:', accounts[0]);
+                    setWalletAddress(accounts[0]);
+                    setWalletConnected(true);
+                    
+                    // Check chain
+                    const chainId = await provider.request({ method: 'eth_chainId' });
+                    console.log('🔗 Current chain:', parseInt(chainId, 16));
+                  }
+                } catch (accountError) {
+                  console.log('ℹ️ No accounts connected yet:', accountError);
                 }
-              } catch (accountError) {
-                console.log('ℹ️ No accounts connected yet:', accountError);
+              } else {
+                console.log('⚠️ Provider does not have request method');
               }
             } else {
-              console.log('❌ No Farcaster Ethereum provider available');
+              console.log('❌ No valid Farcaster Ethereum provider available');
             }
             
           } catch (providerError) {
@@ -182,15 +194,45 @@ const InflyncedPuzzle = () => {
   const connectWallet = async () => {
     try {
       console.log('🔗 Connecting Farcaster wallet...');
+      console.log('🔍 Available providers:', { 
+        ethereumProvider: !!ethereumProvider,
+        sdkInstance: !!sdkInstance,
+        isInFarcaster,
+        typeof_ethereumProvider: typeof ethereumProvider
+      });
       
-      // Only use Farcaster provider - no external wallets
-      if (!ethereumProvider) {
-        throw new Error('This miniapp must be used within Farcaster mobile app to access the built-in wallet.');
+      // Check if we're in Farcaster environment
+      if (!isInFarcaster) {
+        throw new Error('This miniapp must be used within Farcaster mobile app.');
+      }
+      
+      // Try to get the provider if not already available
+      let provider = ethereumProvider;
+      
+      if (!provider && sdkInstance) {
+        try {
+          console.log('🔄 Attempting to get Ethereum provider from SDK...');
+          provider = sdkInstance.wallet.getEthereumProvider();
+          setEthereumProvider(provider);
+          console.log('✅ Got provider from SDK:', !!provider);
+        } catch (providerError) {
+          console.log('❌ Failed to get provider from SDK:', providerError);
+        }
+      }
+      
+      if (!provider) {
+        throw new Error('Farcaster Ethereum provider not available. Please ensure you are using the latest version of Farcaster mobile app.');
+      }
+      
+      // Validate provider has required methods
+      if (typeof provider.request !== 'function') {
+        console.error('❌ Provider does not have request method:', provider);
+        throw new Error('Invalid Ethereum provider. Please restart the Farcaster app and try again.');
       }
       
       console.log('📱 Using Farcaster built-in Ethereum provider');
       
-      const accounts = await ethereumProvider.request({
+      const accounts = await provider.request({
         method: 'eth_requestAccounts'
       });
       
@@ -201,14 +243,14 @@ const InflyncedPuzzle = () => {
         
         // Check/switch to Base chain
         try {
-          const chainId = await ethereumProvider.request({ method: 'eth_chainId' });
+          const chainId = await provider.request({ method: 'eth_chainId' });
           const currentChainId = parseInt(chainId, 16);
           
           console.log('🔗 Current chain ID:', currentChainId, 'Target:', DEFAULT_CHAIN_ID);
           
           if (currentChainId !== DEFAULT_CHAIN_ID) {
             console.log('🔄 Switching to Base chain...');
-            await ethereumProvider.request({
+            await provider.request({
               method: 'wallet_switchEthereumChain',
               params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
             });
@@ -218,7 +260,7 @@ const InflyncedPuzzle = () => {
           console.log('⚠️ Chain switch failed:', switchError);
           // Try adding Base network if switch failed
           try {
-            await ethereumProvider.request({
+            await provider.request({
               method: 'wallet_addEthereumChain',
               params: [{
                 chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}`,
@@ -248,6 +290,8 @@ const InflyncedPuzzle = () => {
         alert('Wallet connection cancelled by user');
       } else if (error.message.includes('must be used within Farcaster')) {
         alert('⚠️ This miniapp requires Farcaster mobile app\n\nPlease open this miniapp in Farcaster mobile to use the built-in wallet features.');
+      } else if (error.message.includes('not available') || error.message.includes('Invalid Ethereum provider')) {
+        alert('⚠️ Wallet provider not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
       } else {
         alert('Failed to connect Farcaster wallet: ' + error.message);
       }
@@ -1013,28 +1057,30 @@ const InflyncedPuzzle = () => {
         {!walletConnected && (
           <div style={{
             padding: '8px 16px',
-            backgroundColor: '#fff3cd',
-            borderBottom: '1px solid #ffeaa7',
+            backgroundColor: isInFarcaster ? '#fff3cd' : '#f8d7da',
+            borderBottom: '1px solid ' + (isInFarcaster ? '#ffeaa7' : '#f5c6cb'),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <span style={{ fontSize: '12px', color: '#856404' }}>
-              📱 Farcaster Wallet Required
+            <span style={{ fontSize: '12px', color: isInFarcaster ? '#856404' : '#721c24' }}>
+              {isInFarcaster ? '📱 Farcaster Wallet Required' : '⚠️ Open in Farcaster App'}
             </span>
             <button
               onClick={connectWallet}
+              disabled={!isInFarcaster}
               style={{
-                backgroundColor: '#8B5CF6',
+                backgroundColor: isInFarcaster ? '#8B5CF6' : '#6c757d',
                 color: 'white',
                 border: 'none',
                 padding: '4px 8px',
                 borderRadius: '4px',
                 fontSize: '10px',
-                cursor: 'pointer'
+                cursor: isInFarcaster ? 'pointer' : 'not-allowed',
+                opacity: isInFarcaster ? 1 : 0.6
               }}
             >
-              Connect Wallet
+              {isInFarcaster ? 'Connect Wallet' : 'Not Available'}
             </button>
           </div>
         )}
