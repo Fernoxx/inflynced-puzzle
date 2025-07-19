@@ -159,15 +159,20 @@ const InflyncedPuzzle = () => {
       console.log('🔗 Connecting Farcaster wallet with wagmi...');
       console.log('🔍 Available connectors:', connectors);
       
-      // Initialize Farcaster SDK context first
+      // Initialize Farcaster SDK context first - REQUIRED
       try {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         await sdk.ready();
         const context = await sdk.context;
         console.log('✅ Farcaster SDK ready, context:', context);
+        
+        // Ensure we're in Farcaster environment
+        if (!context || !context.user) {
+          throw new Error('Not running in Farcaster environment');
+        }
       } catch (sdkError) {
-        console.warn('⚠️ Farcaster SDK initialization issue:', sdkError);
-        // Continue anyway as connector might work
+        console.error('❌ Farcaster SDK initialization failed:', sdkError);
+        throw new Error('This app must be used within Farcaster mobile app');
       }
       
       // Check if we're in Farcaster environment
@@ -244,16 +249,24 @@ const InflyncedPuzzle = () => {
         fid: fid
       });
 
-      // Use Farcaster provider if available, otherwise window.ethereum
-      const provider = window.ethereum;
+      // FARCASTER ONLY - Use Farcaster's built-in wallet provider
+      console.log('📱 Getting Farcaster provider...');
       
-      if (!provider) {
-        throw new Error('No Ethereum provider available');
+      // Get Farcaster SDK provider
+      const { sdk } = await import('@farcaster/miniapp-sdk');
+      const farcasterProvider = sdk.wallet.ethProvider;
+      
+      if (!farcasterProvider) {
+        throw new Error('❌ Farcaster wallet not available. Please use this app inside Farcaster mobile app.');
       }
 
-      // Create ethers provider and signer
-      const ethersProvider = new ethers.BrowserProvider(provider);
+      console.log('✅ Using Farcaster wallet provider');
+      
+      // Create ethers provider with Farcaster's provider
+      const ethersProvider = new ethers.BrowserProvider(farcasterProvider);
       const signer = await ethersProvider.getSigner();
+      
+      console.log('📝 Farcaster wallet connected:', await signer.getAddress());
 
       // SIMPLE SOLUTION: Just send transaction data without ETH value
       console.log('📦 Sending simple transaction with score data...');
@@ -290,9 +303,11 @@ const InflyncedPuzzle = () => {
       } else if (error.message.includes('revert')) {
         alert('Contract rejected the transaction:\n• Check if you have enough ETH for gas\n• Verify contract function exists\n• Ensure parameters are valid');
       } else if (error.message.includes('insufficient funds')) {
-        alert('Insufficient ETH for gas fees. Please add ETH to your wallet.');
+        alert('❌ Insufficient ETH for gas fees on Base network.\n\n💡 You need a small amount of ETH on Base to pay gas fees.\n\nGet ETH on Base:\n• Use Farcaster wallet\n• Bridge from mainnet\n• Use Base faucet');
+      } else if (error.message.includes('Farcaster wallet not available')) {
+        alert('❌ This app only works in Farcaster mobile app.\n\n📱 Please open this miniapp inside Farcaster mobile to use the built-in wallet.');
       } else {
-        alert('Transaction failed: ' + error.message);
+        alert('❌ Transaction failed: ' + error.message);
       }
     } finally {
       setIsSubmittingOnchain(false);
