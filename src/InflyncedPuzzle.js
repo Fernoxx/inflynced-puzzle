@@ -287,15 +287,15 @@ const InflyncedPuzzle = () => {
        } catch (error0) {
          console.log('❌ Strategy 0 failed, trying function calls...');
          
-         // Strategy 1: Simple submitScore(uint256,uint256)
-         try {
-           console.log('🎯 Strategy 1: submitScore(time, puzzleId)...');
-           const abi1 = ["function submitScore(uint256 time, uint256 puzzleId) external"];
-           const contract1 = new ethers.Contract(CONTRACT_ADDRESS, abi1, signer);
-           tx = await contract1.submitScore(scoreInSeconds, puzzleId, { gasLimit: 100000 });
-           success = true;
-           console.log('✅ Strategy 1 WORKED!');
-         } catch (error1) {
+                   // Strategy 1: CORRECT SIGNATURE - submitScore(uint256,string,uint256,uint256)
+          try {
+            console.log('🎯 Strategy 1: CORRECT submitScore(time, username, puzzleId, fid)...');
+            const abi1 = ["function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external"];
+            const contract1 = new ethers.Contract(CONTRACT_ADDRESS, abi1, signer);
+            tx = await contract1.submitScore(scoreInSeconds, username, puzzleId, fid, { gasLimit: 200000 });
+            success = true;
+            console.log('✅ Strategy 1 WORKED - CORRECT SIGNATURE!');
+          } catch (error1) {
         console.log('❌ Strategy 1 failed:', error1.message);
         
         // Strategy 2: submitScore(uint256,string)
