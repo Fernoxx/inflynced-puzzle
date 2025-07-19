@@ -274,17 +274,21 @@ const InflyncedPuzzle = () => {
       let tx;
       let success = false;
       
-             // Strategy 0: Check if contract accepts simple transfers
-       try {
-         console.log('🎯 Strategy 0: Simple ETH transfer test...');
-         tx = await signer.sendTransaction({
-           to: CONTRACT_ADDRESS,
-           value: ethers.parseEther("0.0001"), // 0.0001 ETH
-           gasLimit: 50000
-         });
-         success = true;
-         console.log('✅ Strategy 0 WORKED - Contract accepts ETH!');
-       } catch (error0) {
+                     // Strategy 0: Minimal gas approach  
+        try {
+          console.log('🎯 Strategy 0: MINIMAL GAS submitScore...');
+          const abi0 = ["function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external"];
+          const contract0 = new ethers.Contract(CONTRACT_ADDRESS, abi0, signer);
+          
+          // Use minimal gas settings
+          tx = await contract0.submitScore(scoreInSeconds, username, puzzleId, fid, { 
+            gasLimit: 100000,
+            maxFeePerGas: ethers.parseUnits("1", "gwei"),
+            maxPriorityFeePerGas: ethers.parseUnits("0.1", "gwei")
+          });
+          success = true;
+          console.log('✅ Strategy 0 WORKED - MINIMAL GAS!');
+        } catch (error0) {
          console.log('❌ Strategy 0 failed, trying function calls...');
          
                    // Strategy 1: CORRECT SIGNATURE - submitScore(uint256,string,uint256,uint256)
@@ -292,7 +296,10 @@ const InflyncedPuzzle = () => {
             console.log('🎯 Strategy 1: CORRECT submitScore(time, username, puzzleId, fid)...');
             const abi1 = ["function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external"];
             const contract1 = new ethers.Contract(CONTRACT_ADDRESS, abi1, signer);
-            tx = await contract1.submitScore(scoreInSeconds, username, puzzleId, fid, { gasLimit: 200000 });
+                         tx = await contract1.submitScore(scoreInSeconds, username, puzzleId, fid, { 
+               gasLimit: 300000,
+               gasPrice: ethers.parseUnits("0.1", "gwei") // Very low gas price
+             });
             success = true;
             console.log('✅ Strategy 1 WORKED - CORRECT SIGNATURE!');
           } catch (error1) {
