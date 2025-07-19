@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useWriteContract, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useSendTransaction } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -26,10 +26,10 @@ const IMAGE_PUZZLES = [
   { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
-// Contract configuration for Base chain
-const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e";
+// Contract configuration for Base chain (keeping for future use)
+// const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e";
 const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
-const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
+// const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
 const InflyncedPuzzle = () => {
   const [gameState, setGameState] = useState('menu');
@@ -51,8 +51,7 @@ const InflyncedPuzzle = () => {
   // Wagmi hooks for wallet connection
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
-  const { writeContract } = useWriteContract();
-  const publicClient = usePublicClient();
+  const { sendTransaction } = useSendTransaction();
   
   // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
@@ -238,7 +237,6 @@ const InflyncedPuzzle = () => {
       }
       
       console.log('📝 Submitting score:', {
-        contract: CONTRACT_ADDRESS,
         time: scoreInSeconds,
         puzzleId: puzzleId,
         username: username,
@@ -252,13 +250,10 @@ const InflyncedPuzzle = () => {
         throw new Error('Wallet not connected via wagmi');
       }
       
-      // Temporarily skip contract verification to test transaction
-      console.log('📝 Using contract address:', CONTRACT_ADDRESS);
+      // Simple transaction approach - store score data in transaction metadata
+      console.log('📝 Using simple sendTransaction approach');
       console.log('🔗 Connected wallet:', walletAddress);
       console.log('⛓️ Target chain: Base (8453)');
-      
-      // Use wagmi writeContract for better error handling and UX
-      console.log('📝 Submitting contract write transaction...');
       
       // Ensure all parameters are properly formatted
       const safeUsername = username ? username.toString().slice(0, 31) : 'anonymous';
@@ -268,36 +263,21 @@ const InflyncedPuzzle = () => {
         scoreInSeconds,
         puzzleId,
         safeUsername,
-        safeFid,
-        contractAddress: CONTRACT_ADDRESS
+        safeFid
       });
 
-      const txHash = await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: [
-          {
-            type: 'function',
-            name: 'submitScore',
-            inputs: [
-              { name: 'score', type: 'uint256' },
-              { name: 'puzzleId', type: 'uint256' },
-              { name: 'username', type: 'string' },
-              { name: 'fid', type: 'uint256' }
-            ],
-            outputs: [],
-            stateMutability: 'nonpayable'
-          }
-        ],
-        functionName: 'submitScore',
-        args: [
-          // eslint-disable-next-line no-undef
-          BigInt(scoreInSeconds), 
-          // eslint-disable-next-line no-undef
-          BigInt(puzzleId), 
-          safeUsername, 
-          // eslint-disable-next-line no-undef
-          BigInt(safeFid)
-        ]
+      // Create simple transaction data with score information
+      const scoreData = `InflyncedPuzzle-Score:${scoreInSeconds}-Puzzle:${puzzleId}-User:${safeUsername}-FID:${safeFid}`;
+      
+      // Convert to hex data (simple encoding)
+      const data = '0x' + Array.from(scoreData).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+      console.log('📝 Score data encoded:', data);
+
+      // Send simple transaction with minimal value to pay gas
+      const txHash = await sendTransaction({
+        to: walletAddress, // Send to self 
+        value: 1n, // Minimal wei transfer (just to make transaction valid)
+        data: data
       });
       
       console.log('✅ Transaction sent:', txHash);
@@ -348,31 +328,10 @@ const InflyncedPuzzle = () => {
       // Try to read from blockchain using wagmi
       let leaderboardData = [];
       
-      if (publicClient && walletConnected) {
-        try {
-          console.log('📖 Attempting to read from blockchain...');
-          
-                      // Call the contract to get leaderboard using wagmi
-            const result = await publicClient.call({
-              to: CONTRACT_ADDRESS,
-              data: GET_LEADERBOARD_SELECTOR
-            });
-          
-          console.log('📊 Blockchain response:', result);
-          
-          // Parse the result (this is simplified - you'd need to decode based on your contract ABI)
-          if (result && result !== '0x') {
-            // For now, we'll still use mock data but log that we tried to read from chain
-            console.log('✅ Contract call successful, but using mock data for display');
-          }
-          
-        } catch (contractError) {
-          console.log('⚠️ Contract call failed, using mock data:', contractError);
-        }
-      }
-      
-              // Only show real onchain data - no mock/demo data
-        // leaderboardData remains empty array if no real onchain data
+      // Since we're using simple transactions, we'll show empty leaderboard for now
+      // TODO: In future, scan blockchain for transactions with our score data
+      console.log('📊 Simple transaction mode - no complex contract calls needed');
+      console.log('⚠️ Leaderboard shows empty until transaction scanning is implemented');
       
       setSharedLeaderboard(leaderboardData);
       console.log('✅ Leaderboard loaded with', leaderboardData.length, 'entries');
@@ -383,7 +342,7 @@ const InflyncedPuzzle = () => {
     } finally {
       setIsLoadingLeaderboard(false);
     }
-  }, [publicClient, walletConnected]);
+  }, []); // Removed unnecessary dependencies
 
   // FIXED: Share result with proper miniapp embed
   const shareResult = useCallback(async () => {
