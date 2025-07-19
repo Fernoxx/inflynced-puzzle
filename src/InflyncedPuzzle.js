@@ -255,84 +255,19 @@ const InflyncedPuzzle = () => {
       const ethersProvider = new ethers.BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
 
-      // Try multiple function signatures to match your contract
-      let tx;
-      let success = false;
+      // SIMPLE SOLUTION: Just send transaction data without ETH value
+      console.log('📦 Sending simple transaction with score data...');
       
-      // Strategy 1: Try the original function signature
-      try {
-        console.log('📦 Strategy 1: Trying submitScore(uint256,uint256,string,uint256)...');
-        
-        const contractABI1 = [
-          "function submitScore(uint256 time, uint256 puzzleId, string memory username, uint256 fid) external"
-        ];
-        
-        const contract1 = new ethers.Contract(CONTRACT_ADDRESS, contractABI1, signer);
-        tx = await contract1.submitScore(scoreInSeconds, puzzleId, username, fid);
-        success = true;
-        console.log('✅ Strategy 1 successful');
-        
-      } catch (error1) {
-        console.log('⚠️ Strategy 1 failed:', error1.message);
-        
-        // Strategy 2: Try with different parameter order (score, puzzleId)
-        try {
-          console.log('📦 Strategy 2: Trying submitScore(uint256,uint256)...');
-          
-          const contractABI2 = [
-            "function submitScore(uint256 score, uint256 puzzleId) external"
-          ];
-          
-          const contract2 = new ethers.Contract(CONTRACT_ADDRESS, contractABI2, signer);
-          tx = await contract2.submitScore(scoreInSeconds, puzzleId);
-          success = true;
-          console.log('✅ Strategy 2 successful');
-          
-        } catch (error2) {
-          console.log('⚠️ Strategy 2 failed:', error2.message);
-          
-          // Strategy 3: Try simple submit function
-          try {
-            console.log('📦 Strategy 3: Trying submit(uint256)...');
-            
-            const contractABI3 = [
-              "function submit(uint256 data) external payable"
-            ];
-            
-            const contract3 = new ethers.Contract(CONTRACT_ADDRESS, contractABI3, signer);
-            tx = await contract3.submit(scoreInSeconds, {
-              value: ethers.parseEther("0.001") // Send 0.001 ETH
-            });
-            success = true;
-            console.log('✅ Strategy 3 successful');
-            
-          } catch (error3) {
-            console.log('⚠️ Strategy 3 failed:', error3.message);
-            
-            // Strategy 4: Try fallback - just send ETH to contract
-            try {
-              console.log('📦 Strategy 4: Trying ETH transfer with data...');
-              
-              const scoreData = ethers.toUtf8Bytes(`InflyncedPuzzle:${scoreInSeconds}:${puzzleId}:${username}:${fid}`);
-              
-              tx = await signer.sendTransaction({
-                to: CONTRACT_ADDRESS,
-                value: ethers.parseEther("0.01"), // 0.01 ETH
-                data: ethers.hexlify(scoreData)
-              });
-              success = true;
-              console.log('✅ Strategy 4 successful');
-              
-            } catch (error4) {
-              throw new Error(`All strategies failed. Your contract might need different function signatures. Last error: ${error4.message}`);
-            }
-          }
-        }
-      }
+      // Create simple data payload
+      const scoreData = `${scoreInSeconds.toString(16).padStart(8, '0')}${puzzleId.toString(16).padStart(8, '0')}`;
       
-      if (!success || !tx) {
-        throw new Error('Failed to submit transaction');
-      }
+      // Send basic transaction with minimal gas
+      const tx = await signer.sendTransaction({
+        to: CONTRACT_ADDRESS,
+        value: 0, // NO ETH transfer - just gas
+        data: '0x' + scoreData,
+        gasLimit: 21000 // Minimal gas for simple transaction
+      });
       
       console.log('✅ Transaction sent:', tx.hash);
       
