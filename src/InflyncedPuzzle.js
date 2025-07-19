@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { ethers } from 'ethers';
+import { useAccount, useConnect, useWriteContract, usePublicClient } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -28,7 +29,6 @@ const IMAGE_PUZZLES = [
 
 // Contract configuration for Base chain
 const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e";
-const SUBMIT_SCORE_SELECTOR = process.env.REACT_APP_SUBMIT_SCORE_FUNCTION_SELECTOR || "0x9d6e367a";
 const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
@@ -49,11 +49,14 @@ const InflyncedPuzzle = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showSnowEffect, setShowSnowEffect] = useState(false);
   
-  // Wallet connection states
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState(null);
+  // Wagmi hooks for wallet connection
+  const { address: walletAddress, isConnected: walletConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { writeContract } = useWriteContract();
+  const publicClient = usePublicClient();
+  
+  // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
-  const [ethereumProvider, setEthereumProvider] = useState(null);
   const [isSubmittingOnchain, setIsSubmittingOnchain] = useState(false);
   
   const audioContextRef = useRef(null);
@@ -102,17 +105,17 @@ const InflyncedPuzzle = () => {
       try {
         console.log('🔄 Initializing Farcaster miniapp...');
         
-        // Import Farcaster SDK
+        // Import latest Farcaster SDK
         const { sdk } = await import('@farcaster/miniapp-sdk');
         setSdkInstance(sdk);
         
-        console.log('📋 SDK loaded successfully');
+        console.log('📋 Latest SDK loaded successfully');
         
         // CRITICAL: Call ready() first
         await sdk.actions.ready();
         console.log('✅ SDK ready() called');
         
-        // Get context
+        // Get context with latest API
         const context = await sdk.context;
         console.log('📱 Farcaster context:', context);
         
@@ -127,49 +130,8 @@ const InflyncedPuzzle = () => {
           setIsInFarcaster(true);
           console.log('✅ Farcaster user profile:', userProfile);
           
-          // Get Farcaster's Ethereum provider
-          try {
-            console.log('🔗 Getting Farcaster Ethereum provider...');
-            
-            // Wait a bit for SDK to fully initialize
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const provider = sdk.wallet.getEthereumProvider();
-            
-            if (provider && typeof provider === 'object') {
-              console.log('✅ Farcaster Ethereum provider obtained!', typeof provider);
-              console.log('🔍 Provider methods:', Object.keys(provider));
-              setEthereumProvider(provider);
-              
-              // Validate provider has required methods
-              if (typeof provider.request === 'function') {
-                console.log('✅ Provider has request method');
-                
-                // Check if wallet is already connected
-                try {
-                  const accounts = await provider.request({ method: 'eth_accounts' });
-                  if (accounts && accounts.length > 0) {
-                    console.log('✅ Farcaster wallet already connected:', accounts[0]);
-                    setWalletAddress(accounts[0]);
-                    setWalletConnected(true);
-                    
-                    // Check chain
-                    const chainId = await provider.request({ method: 'eth_chainId' });
-                    console.log('🔗 Current chain:', parseInt(chainId, 16));
-                  }
-                } catch (accountError) {
-                  console.log('ℹ️ No accounts connected yet:', accountError);
-                }
-              } else {
-                console.log('⚠️ Provider does not have request method');
-              }
-            } else {
-              console.log('❌ No valid Farcaster Ethereum provider available');
-            }
-            
-          } catch (providerError) {
-            console.log('❌ Failed to get Farcaster provider:', providerError);
-          }
+          // Note: Wallet connection now handled by wagmi
+          console.log('ℹ️ Wallet connection will be handled by wagmi when user clicks connect');
           
         } else {
           console.log('❌ No Farcaster user context');
@@ -190,98 +152,32 @@ const InflyncedPuzzle = () => {
     initializeFarcasterWallet();
   }, [getFallbackUserProfile]);
 
-  // Connect wallet using Farcaster built-in wallet only
+  // Connect wallet using wagmi and Farcaster connector
   const connectWallet = async () => {
     try {
-      console.log('🔗 Connecting Farcaster wallet...');
-      console.log('🔍 Available providers:', { 
-        ethereumProvider: !!ethereumProvider,
-        sdkInstance: !!sdkInstance,
-        isInFarcaster,
-        typeof_ethereumProvider: typeof ethereumProvider
-      });
+      console.log('🔗 Connecting Farcaster wallet with wagmi...');
+      console.log('🔍 Available connectors:', connectors);
       
       // Check if we're in Farcaster environment
       if (!isInFarcaster) {
         throw new Error('This miniapp must be used within Farcaster mobile app.');
       }
       
-      // Try to get the provider if not already available
-      let provider = ethereumProvider;
+      // Find the Farcaster connector
+      const farcasterConnector = connectors.find(connector => 
+        connector.id === 'farcasterMiniApp' || connector.name?.includes('Farcaster')
+      );
       
-      if (!provider && sdkInstance) {
-        try {
-          console.log('🔄 Attempting to get Ethereum provider from SDK...');
-          provider = sdkInstance.wallet.getEthereumProvider();
-          setEthereumProvider(provider);
-          console.log('✅ Got provider from SDK:', !!provider);
-        } catch (providerError) {
-          console.log('❌ Failed to get provider from SDK:', providerError);
-        }
+      if (!farcasterConnector) {
+        throw new Error('Farcaster connector not found. Please ensure you are using the latest version of Farcaster mobile app.');
       }
       
-      if (!provider) {
-        throw new Error('Farcaster Ethereum provider not available. Please ensure you are using the latest version of Farcaster mobile app.');
-      }
+      console.log('📱 Using Farcaster wagmi connector:', farcasterConnector.name);
       
-      // Validate provider has required methods
-      if (typeof provider.request !== 'function') {
-        console.error('❌ Provider does not have request method:', provider);
-        throw new Error('Invalid Ethereum provider. Please restart the Farcaster app and try again.');
-      }
+      // Connect using wagmi
+      await connect({ connector: farcasterConnector });
       
-      console.log('📱 Using Farcaster built-in Ethereum provider');
-      
-      const accounts = await provider.request({
-        method: 'eth_requestAccounts'
-      });
-      
-      if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-        setWalletConnected(true);
-        console.log('✅ Farcaster wallet connected:', accounts[0]);
-        
-        // Check/switch to Base chain
-        try {
-          const chainId = await provider.request({ method: 'eth_chainId' });
-          const currentChainId = parseInt(chainId, 16);
-          
-          console.log('🔗 Current chain ID:', currentChainId, 'Target:', DEFAULT_CHAIN_ID);
-          
-          if (currentChainId !== DEFAULT_CHAIN_ID) {
-            console.log('🔄 Switching to Base chain...');
-            await provider.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
-            });
-            console.log('✅ Switched to Base chain');
-          }
-        } catch (switchError) {
-          console.log('⚠️ Chain switch failed:', switchError);
-          // Try adding Base network if switch failed
-          try {
-            await provider.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}`,
-                chainName: 'Base',
-                nativeCurrency: {
-                  name: 'ETH',
-                  symbol: 'ETH',
-                  decimals: 18,
-                },
-                rpcUrls: ['https://mainnet.base.org'],
-                blockExplorerUrls: ['https://basescan.org'],
-              }],
-            });
-            console.log('✅ Added and switched to Base chain');
-          } catch (addError) {
-            console.log('⚠️ Failed to add Base chain:', addError);
-          }
-        }
-      } else {
-        throw new Error('No accounts found in Farcaster wallet');
-      }
+      console.log('✅ Farcaster wallet connected via wagmi');
       
     } catch (error) {
       console.error('❌ Farcaster wallet connection failed:', error);
@@ -290,52 +186,15 @@ const InflyncedPuzzle = () => {
         alert('Wallet connection cancelled by user');
       } else if (error.message.includes('must be used within Farcaster')) {
         alert('⚠️ This miniapp requires Farcaster mobile app\n\nPlease open this miniapp in Farcaster mobile to use the built-in wallet features.');
-      } else if (error.message.includes('not available') || error.message.includes('Invalid Ethereum provider')) {
-        alert('⚠️ Wallet provider not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
+      } else if (error.message.includes('not found') || error.message.includes('connector')) {
+        alert('⚠️ Farcaster wallet connector not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
       } else {
         alert('Failed to connect Farcaster wallet: ' + error.message);
       }
     }
   };
 
-  // Helper function to encode transaction data using ethers.js
-  const encodeSubmitScoreData = (scoreInSeconds, puzzleId, username, fid) => {
-    try {
-      // Define the contract ABI for the submitScore function
-      const contractABI = [
-        "function submitScore(uint256 score, uint256 puzzleId, string memory username, uint256 fid)"
-      ];
-      
-      // Create contract interface
-      const contractInterface = new ethers.utils.Interface(contractABI);
-      
-      // Encode function data
-      const encodedData = contractInterface.encodeFunctionData("submitScore", [
-        ethers.BigNumber.from(scoreInSeconds),
-        ethers.BigNumber.from(puzzleId),
-        username.slice(0, 31), // Limit username length
-        ethers.BigNumber.from(fid)
-      ]);
-      
-      console.log('✅ Encoded transaction data with ethers.js:', encodedData);
-      return encodedData;
-      
-    } catch (error) {
-      console.error('❌ Failed to encode transaction data:', error);
-      
-      // Fallback to manual encoding if ethers.js fails
-      console.log('🔄 Using fallback manual encoding...');
-      const selector = SUBMIT_SCORE_SELECTOR;
-      
-      // Simple fallback - just function selector with basic uint256 parameters
-      const scoreHex = scoreInSeconds.toString(16).padStart(64, '0');
-      const puzzleIdHex = puzzleId.toString(16).padStart(64, '0');
-      const fidHex = fid.toString(16).padStart(64, '0');
-      const usernameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(username)).slice(2);
-      
-      return selector + scoreHex + puzzleIdHex + usernameHash.padStart(64, '0') + fidHex;
-    }
-  };
+
 
   // Submit score onchain
   const submitScoreOnchain = async (time, puzzleId) => {
@@ -363,21 +222,16 @@ const InflyncedPuzzle = () => {
         walletAddress: walletAddress
       });
       
-      // Use Farcaster provider if available
-      const provider = ethereumProvider || window.ethereum;
-      
-      if (!provider) {
-        throw new Error('No Ethereum provider available');
+      // Use wagmi for provider
+      if (!walletConnected || !walletAddress) {
+        throw new Error('Wallet not connected via wagmi');
       }
       
-      // Verify contract exists at address
+      // Verify contract exists at address using wagmi
       try {
-        const code = await provider.request({
-          method: 'eth_getCode',
-          params: [CONTRACT_ADDRESS, 'latest']
-        });
+        const code = await publicClient.getCode({ address: CONTRACT_ADDRESS });
         
-        if (code === '0x' || code === '0x0') {
+        if (!code || code === '0x') {
           throw new Error(`No contract found at address ${CONTRACT_ADDRESS} on Base chain. Please verify the contract address.`);
         }
         console.log('✅ Contract verified at address:', CONTRACT_ADDRESS);
@@ -386,38 +240,32 @@ const InflyncedPuzzle = () => {
         throw codeError;
       }
       
-      // Encode transaction data
-      const transactionData = encodeSubmitScoreData(scoreInSeconds, puzzleId, username, fid);
-      console.log('🔢 Transaction data:', transactionData);
+      // Use wagmi writeContract for better error handling and UX
+      console.log('📝 Submitting contract write transaction...');
       
-      // Estimate gas first
-      let gasEstimate;
-      try {
-        gasEstimate = await provider.request({
-          method: 'eth_estimateGas',
-          params: [{
-            to: CONTRACT_ADDRESS,
-            from: walletAddress,
-            data: transactionData,
-            value: '0x0'
-          }]
-        });
-        console.log('⛽ Gas estimate:', gasEstimate);
-      } catch (gasError) {
-        console.log('⚠️ Gas estimation failed, using default:', gasError);
-        gasEstimate = '0x186A0'; // 100000 fallback
-      }
-      
-      // Send transaction
-      const txHash = await provider.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          to: CONTRACT_ADDRESS,
-          from: walletAddress,
-          data: transactionData,
-          value: '0x0',
-          gas: gasEstimate
-        }]
+      const txHash = await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: [
+          {
+            type: 'function',
+            name: 'submitScore',
+            inputs: [
+              { name: 'score', type: 'uint256' },
+              { name: 'puzzleId', type: 'uint256' },
+              { name: 'username', type: 'string' },
+              { name: 'fid', type: 'uint256' }
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable'
+          }
+        ],
+        functionName: 'submitScore',
+        args: [
+          ethers.BigNumber.from(scoreInSeconds), 
+          ethers.BigNumber.from(puzzleId), 
+          username.slice(0, 31), 
+          ethers.BigNumber.from(fid)
+        ]
       });
       
       console.log('✅ Transaction sent:', txHash);
@@ -450,22 +298,18 @@ const InflyncedPuzzle = () => {
     try {
       console.log('🔄 Loading onchain leaderboard...');
       
-      // Try to read from blockchain first
-      const provider = ethereumProvider || window.ethereum;
+      // Try to read from blockchain using wagmi
       let leaderboardData = [];
       
-      if (provider && walletConnected) {
+      if (publicClient && walletConnected) {
         try {
           console.log('📖 Attempting to read from blockchain...');
           
-          // Call the contract to get leaderboard
-          const result = await provider.request({
-            method: 'eth_call',
-            params: [{
+                      // Call the contract to get leaderboard using wagmi
+            const result = await publicClient.call({
               to: CONTRACT_ADDRESS,
               data: GET_LEADERBOARD_SELECTOR
-            }, 'latest']
-          });
+            });
           
           console.log('📊 Blockchain response:', result);
           
@@ -501,7 +345,7 @@ const InflyncedPuzzle = () => {
     } finally {
       setIsLoadingLeaderboard(false);
     }
-  }, [ethereumProvider, walletConnected]);
+  }, [publicClient, walletConnected]);
 
   // FIXED: Share result with proper miniapp embed
   const shareResult = useCallback(async () => {
