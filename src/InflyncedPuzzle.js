@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
+import { ethers } from 'ethers';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -177,91 +178,119 @@ const InflyncedPuzzle = () => {
     initializeFarcasterWallet();
   }, [getFallbackUserProfile]);
 
-  // Connect wallet using Farcaster provider
+  // Connect wallet using Farcaster built-in wallet only
   const connectWallet = async () => {
     try {
-      console.log('🔗 Connecting wallet...');
+      console.log('🔗 Connecting Farcaster wallet...');
       
-      // First try Farcaster provider
-      if (ethereumProvider) {
-        console.log('📱 Using Farcaster Ethereum provider');
-        
-        try {
-          const accounts = await ethereumProvider.request({
-            method: 'eth_requestAccounts'
-          });
-          
-          if (accounts && accounts.length > 0) {
-            setWalletAddress(accounts[0]);
-            setWalletConnected(true);
-            console.log('✅ Farcaster wallet connected:', accounts[0]);
-            
-            // Check/switch to Base chain
-            try {
-              const chainId = await ethereumProvider.request({ method: 'eth_chainId' });
-              const currentChainId = parseInt(chainId, 16);
-              
-              if (currentChainId !== DEFAULT_CHAIN_ID) {
-                console.log('🔄 Switching to Base chain...');
-                await ethereumProvider.request({
-                  method: 'wallet_switchEthereumChain',
-                  params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
-                });
-              }
-            } catch (switchError) {
-              console.log('⚠️ Chain switch failed:', switchError);
-            }
-            
-            return;
-          }
-        } catch (farcasterError) {
-          console.log('❌ Farcaster wallet connection failed:', farcasterError);
-          throw farcasterError;
-        }
+      // Only use Farcaster provider - no external wallets
+      if (!ethereumProvider) {
+        throw new Error('This miniapp must be used within Farcaster mobile app to access the built-in wallet.');
       }
       
-      // Fallback to window.ethereum
-      if (window.ethereum) {
-        console.log('🔄 Falling back to window.ethereum...');
+      console.log('📱 Using Farcaster built-in Ethereum provider');
+      
+      const accounts = await ethereumProvider.request({
+        method: 'eth_requestAccounts'
+      });
+      
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        setWalletConnected(true);
+        console.log('✅ Farcaster wallet connected:', accounts[0]);
         
-        const accounts = await window.ethereum.request({
-          method: 'eth_requestAccounts'
-        });
-        
-        if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-          setWalletConnected(true);
-          console.log('✅ External wallet connected:', accounts[0]);
+        // Check/switch to Base chain
+        try {
+          const chainId = await ethereumProvider.request({ method: 'eth_chainId' });
+          const currentChainId = parseInt(chainId, 16);
+          
+          console.log('🔗 Current chain ID:', currentChainId, 'Target:', DEFAULT_CHAIN_ID);
+          
+          if (currentChainId !== DEFAULT_CHAIN_ID) {
+            console.log('🔄 Switching to Base chain...');
+            await ethereumProvider.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}` }],
+            });
+            console.log('✅ Switched to Base chain');
+          }
+        } catch (switchError) {
+          console.log('⚠️ Chain switch failed:', switchError);
+          // Try adding Base network if switch failed
+          try {
+            await ethereumProvider.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: `0x${DEFAULT_CHAIN_ID.toString(16)}`,
+                chainName: 'Base',
+                nativeCurrency: {
+                  name: 'ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+                rpcUrls: ['https://mainnet.base.org'],
+                blockExplorerUrls: ['https://basescan.org'],
+              }],
+            });
+            console.log('✅ Added and switched to Base chain');
+          } catch (addError) {
+            console.log('⚠️ Failed to add Base chain:', addError);
+          }
         }
       } else {
-        throw new Error('No wallet detected. Please use Farcaster mobile app.');
+        throw new Error('No accounts found in Farcaster wallet');
       }
       
     } catch (error) {
-      console.error('❌ Wallet connection failed:', error);
-      alert('Wallet connection failed: ' + error.message);
+      console.error('❌ Farcaster wallet connection failed:', error);
+      
+      if (error.code === 4001) {
+        alert('Wallet connection cancelled by user');
+      } else if (error.message.includes('must be used within Farcaster')) {
+        alert('⚠️ This miniapp requires Farcaster mobile app\n\nPlease open this miniapp in Farcaster mobile to use the built-in wallet features.');
+      } else {
+        alert('Failed to connect Farcaster wallet: ' + error.message);
+      }
     }
   };
 
-  // Helper function to encode transaction data
+  // Helper function to encode transaction data using ethers.js
   const encodeSubmitScoreData = (scoreInSeconds, puzzleId, username, fid) => {
-    // This is a simplified encoding - you may need to adjust based on your contract ABI
-    // For now, we'll use the function selector with basic parameters
-    const selector = SUBMIT_SCORE_SELECTOR.slice(2); // Remove 0x prefix
-    
-    // Convert parameters to hex (padded to 32 bytes each)
-    const scoreHex = scoreInSeconds.toString(16).padStart(64, '0');
-    const puzzleIdHex = puzzleId.toString(16).padStart(64, '0');
-    const fidHex = fid.toString(16).padStart(64, '0');
-    
-    // For username, we'll convert to bytes32 (simplified)
-    const usernameBytes = new TextEncoder().encode(username.slice(0, 31));
-    const usernameHex = Array.from(usernameBytes)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-      .padEnd(64, '0');
-    
-    return '0x' + selector + scoreHex + puzzleIdHex + usernameHex + fidHex;
+    try {
+      // Define the contract ABI for the submitScore function
+      const contractABI = [
+        "function submitScore(uint256 score, uint256 puzzleId, string memory username, uint256 fid)"
+      ];
+      
+      // Create contract interface
+      const contractInterface = new ethers.utils.Interface(contractABI);
+      
+      // Encode function data
+      const encodedData = contractInterface.encodeFunctionData("submitScore", [
+        ethers.BigNumber.from(scoreInSeconds),
+        ethers.BigNumber.from(puzzleId),
+        username.slice(0, 31), // Limit username length
+        ethers.BigNumber.from(fid)
+      ]);
+      
+      console.log('✅ Encoded transaction data with ethers.js:', encodedData);
+      return encodedData;
+      
+    } catch (error) {
+      console.error('❌ Failed to encode transaction data:', error);
+      
+      // Fallback to manual encoding if ethers.js fails
+      console.log('🔄 Using fallback manual encoding...');
+      const selector = SUBMIT_SCORE_SELECTOR;
+      
+      // Simple fallback - just function selector with basic uint256 parameters
+      const scoreHex = scoreInSeconds.toString(16).padStart(64, '0');
+      const puzzleIdHex = puzzleId.toString(16).padStart(64, '0');
+      const fidHex = fid.toString(16).padStart(64, '0');
+      const usernameHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(username)).slice(2);
+      
+      return selector + scoreHex + puzzleIdHex + usernameHash.padStart(64, '0') + fidHex;
+    }
   };
 
   // Submit score onchain
@@ -285,7 +314,9 @@ const InflyncedPuzzle = () => {
         time: scoreInSeconds,
         puzzleId: puzzleId,
         username: username,
-        fid: fid
+        fid: fid,
+        chainId: DEFAULT_CHAIN_ID,
+        walletAddress: walletAddress
       });
       
       // Use Farcaster provider if available
@@ -295,9 +326,43 @@ const InflyncedPuzzle = () => {
         throw new Error('No Ethereum provider available');
       }
       
+      // Verify contract exists at address
+      try {
+        const code = await provider.request({
+          method: 'eth_getCode',
+          params: [CONTRACT_ADDRESS, 'latest']
+        });
+        
+        if (code === '0x' || code === '0x0') {
+          throw new Error(`No contract found at address ${CONTRACT_ADDRESS} on Base chain. Please verify the contract address.`);
+        }
+        console.log('✅ Contract verified at address:', CONTRACT_ADDRESS);
+      } catch (codeError) {
+        console.error('❌ Contract verification failed:', codeError);
+        throw codeError;
+      }
+      
       // Encode transaction data
       const transactionData = encodeSubmitScoreData(scoreInSeconds, puzzleId, username, fid);
       console.log('🔢 Transaction data:', transactionData);
+      
+      // Estimate gas first
+      let gasEstimate;
+      try {
+        gasEstimate = await provider.request({
+          method: 'eth_estimateGas',
+          params: [{
+            to: CONTRACT_ADDRESS,
+            from: walletAddress,
+            data: transactionData,
+            value: '0x0'
+          }]
+        });
+        console.log('⛽ Gas estimate:', gasEstimate);
+      } catch (gasError) {
+        console.log('⚠️ Gas estimation failed, using default:', gasError);
+        gasEstimate = '0x186A0'; // 100000 fallback
+      }
       
       // Send transaction
       const txHash = await provider.request({
@@ -307,7 +372,7 @@ const InflyncedPuzzle = () => {
           from: walletAddress,
           data: transactionData,
           value: '0x0',
-          gas: '0x186A0' // 100000 gas limit
+          gas: gasEstimate
         }]
       });
       
@@ -955,7 +1020,7 @@ const InflyncedPuzzle = () => {
             justifyContent: 'space-between'
           }}>
             <span style={{ fontSize: '12px', color: '#856404' }}>
-              ⚠️ Wallet Not Connected
+              📱 Farcaster Wallet Required
             </span>
             <button
               onClick={connectWallet}
@@ -969,7 +1034,7 @@ const InflyncedPuzzle = () => {
                 cursor: 'pointer'
               }}
             >
-              Connect
+              Connect Wallet
             </button>
           </div>
         )}
@@ -1164,7 +1229,7 @@ const InflyncedPuzzle = () => {
                   fontSize: '12px',
                   color: '#856404'
                 }}>
-                  💡 Connect your wallet to save scores onchain!
+                  📱 Connect your Farcaster wallet to save scores on Base blockchain!
                 </div>
               )}
               
