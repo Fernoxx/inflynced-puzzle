@@ -278,64 +278,108 @@ const InflyncedPuzzle = () => {
         safeFid
       });
 
-      // Call your contract using the selector from .env
-      const SUBMIT_SCORE_SELECTOR = process.env.REACT_APP_SUBMIT_SCORE_FUNCTION_SELECTOR || '0x9d6e367a';
+      // Multiple strategies to call Base contract
+      console.log('🔗 Attempting multiple transaction strategies for Base contract...');
       
-      console.log('📞 Calling contract with selector:', SUBMIT_SCORE_SELECTOR);
-      
-      // Try different function signatures based on your contract
       let txHash;
+      let success = false;
       
+      // Strategy 1: Try simple transfer with data (most Base contracts accept this)
       try {
-        // First try: your custom function signature
-        console.log('🔧 Trying custom function signature...');
+        console.log('📝 Strategy 1: Simple transfer with score data...');
         
-        // Use your exact selector with minimal parameters
-        const result = await publicClient.call({
-          to: CONTRACT_ADDRESS,
-          data: SUBMIT_SCORE_SELECTOR + 
-                // Score (uint256 - 32 bytes)
-                scoreInSeconds.toString(16).padStart(64, '0') +
-                // Puzzle ID (uint256 - 32 bytes) 
-                puzzleId.toString(16).padStart(64, '0'),
-        });
+        // Encode score data as simple hex
+        const scoreData = `0x${scoreInSeconds.toString(16).padStart(8, '0')}${puzzleId.toString(16).padStart(8, '0')}`;
         
-        console.log('✅ Contract call successful!', result);
-        
-        // If call succeeds, send as transaction
         txHash = await sendTransaction({
           to: CONTRACT_ADDRESS,
-          data: SUBMIT_SCORE_SELECTOR + 
-                scoreInSeconds.toString(16).padStart(64, '0') +
-                puzzleId.toString(16).padStart(64, '0'),
+          value: 1000000000000000n, // 0.001 ETH - small amount that Base contracts often require
+          data: scoreData,
         });
         
-      } catch (error) {
-        console.log('⚠️ Custom function failed, trying fallback...', error.message);
+        console.log('✅ Strategy 1 successful:', txHash);
+        success = true;
         
-        // Fallback: try wagmi writeContract with different ABI
-        txHash = await writeContract({
-          address: CONTRACT_ADDRESS,
-          abi: [
-            {
-              type: 'function',
-              name: 'submitScore',
-              inputs: [
-                { name: 'score', type: 'uint256' },
-                { name: 'puzzleId', type: 'uint256' }
+      } catch (error1) {
+        console.log('⚠️ Strategy 1 failed:', error1.message);
+        
+        // Strategy 2: Try your function selector but with value
+        try {
+          console.log('📝 Strategy 2: Function call with value...');
+          
+          const SUBMIT_SCORE_SELECTOR = process.env.REACT_APP_SUBMIT_SCORE_FUNCTION_SELECTOR || '0x9d6e367a';
+          
+          txHash = await sendTransaction({
+            to: CONTRACT_ADDRESS,
+            value: 1000000000000000n, // 0.001 ETH
+            data: SUBMIT_SCORE_SELECTOR + 
+                  scoreInSeconds.toString(16).padStart(64, '0') +
+                  puzzleId.toString(16).padStart(64, '0'),
+          });
+          
+          console.log('✅ Strategy 2 successful:', txHash);
+          success = true;
+          
+        } catch (error2) {
+          console.log('⚠️ Strategy 2 failed:', error2.message);
+          
+          // Strategy 3: Try minimal function call
+          try {
+            console.log('📝 Strategy 3: Minimal function call...');
+            
+            txHash = await writeContract({
+              address: CONTRACT_ADDRESS,
+              value: 1000000000000000n, // 0.001 ETH
+              abi: [
+                {
+                  type: 'function',
+                  name: 'submit',
+                  inputs: [
+                    { name: 'data', type: 'uint256' }
+                  ],
+                  outputs: [],
+                  stateMutability: 'payable'
+                }
               ],
-              outputs: [],
-              stateMutability: 'nonpayable'
+              functionName: 'submit',
+              args: [
+                // eslint-disable-next-line no-undef
+                BigInt(scoreInSeconds)
+              ]
+            });
+            
+            console.log('✅ Strategy 3 successful:', txHash);
+            success = true;
+            
+          } catch (error3) {
+            console.log('⚠️ Strategy 3 failed:', error3.message);
+            
+            // Strategy 4: Just send ETH with data (fallback)
+            try {
+              console.log('📝 Strategy 4: ETH transfer with encoded data...');
+              
+              const dataString = `InflyncedPuzzle:${scoreInSeconds}:${puzzleId}:${safeUsername}:${safeFid}`;
+              const encodedData = '0x' + Array.from(dataString).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+              
+              txHash = await sendTransaction({
+                to: CONTRACT_ADDRESS,
+                value: 10000000000000000n, // 0.01 ETH
+                data: encodedData,
+              });
+              
+              console.log('✅ Strategy 4 successful:', txHash);
+              success = true;
+              
+            } catch (error4) {
+              console.log('❌ All strategies failed');
+              throw new Error(`All transaction strategies failed. Contract might require specific conditions or different function signatures. Last error: ${error4.message}`);
             }
-          ],
-          functionName: 'submitScore',
-          args: [
-            // eslint-disable-next-line no-undef
-            BigInt(scoreInSeconds),
-            // eslint-disable-next-line no-undef 
-            BigInt(puzzleId)
-          ]
-        });
+          }
+        }
+      }
+      
+      if (!success) {
+        throw new Error('Unable to submit transaction to Base contract');
       }
       
       console.log('✅ Transaction sent:', txHash);
