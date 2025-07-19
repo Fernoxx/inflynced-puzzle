@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useSendTransaction, useWriteContract, usePublicClient } from 'wagmi';
+import { ethers } from 'ethers';
+import { useAccount, useConnect, usePublicClient } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -28,7 +29,7 @@ const IMAGE_PUZZLES = [
 
 // Contract configuration for Base chain - USER'S ACTUAL CONTRACT
 const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e"; // Replace with your actual contract
-const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
+// const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
 const InflyncedPuzzle = () => {
@@ -51,8 +52,8 @@ const InflyncedPuzzle = () => {
   // Wagmi hooks for wallet connection
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
-  const { sendTransaction } = useSendTransaction(); // Used as fallback method
-  const { writeContract } = useWriteContract();
+  // const { sendTransaction } = useSendTransaction(); // Not used with ethers.js
+  // const { writeContract } = useWriteContract(); // Not used with ethers.js
   const publicClient = usePublicClient();
   
   // Legacy states for compatibility
@@ -214,7 +215,7 @@ const InflyncedPuzzle = () => {
 
 
 
-  // Submit score onchain
+  // Submit score onchain using ethers.js
   const submitScoreOnchain = async (time, puzzleId) => {
     if (!walletConnected || !walletAddress) {
       alert('Please connect your wallet first');
@@ -230,190 +231,61 @@ const InflyncedPuzzle = () => {
       const username = userProfile?.username || userProfile?.displayName || 'anonymous';
       const fid = userProfile?.fid || 0;
       
-      // Validate required data
-      if (!scoreInSeconds || scoreInSeconds <= 0) {
-        throw new Error('Invalid score time');
-      }
-      if (!puzzleId || puzzleId <= 0) {
-        throw new Error('Invalid puzzle ID');
-      }
-      
-            console.log('📝 Submitting score to YOUR contract:', {
+      console.log('📝 Submitting score:', {
         contract: CONTRACT_ADDRESS,
         time: scoreInSeconds,
         puzzleId: puzzleId,
         username: username,
-        fid: fid,
-        chainId: DEFAULT_CHAIN_ID,
-        walletAddress: walletAddress
+        fid: fid
       });
 
-      // Use wagmi for provider
-      if (!walletConnected || !walletAddress) {
-        throw new Error('Wallet not connected via wagmi');
+      // Use Farcaster provider if available, otherwise window.ethereum
+      const provider = window.ethereum;
+      
+      if (!provider) {
+        throw new Error('No Ethereum provider available');
       }
-      
-      // First, let's verify your contract exists
-      console.log('🔍 Checking if contract exists at:', CONTRACT_ADDRESS);
-      try {
-        const code = await publicClient.getCode({ address: CONTRACT_ADDRESS });
-        if (!code || code === '0x') {
-          throw new Error(`❌ NO CONTRACT found at ${CONTRACT_ADDRESS}!\n\n🚨 You need to:\n1. Deploy your contract to Base\n2. Update CONTRACT_ADDRESS in the code\n3. Or set REACT_APP_CONTRACT_ADDRESS env variable`);
-        }
-        console.log('✅ Contract found at address:', CONTRACT_ADDRESS);
-      } catch (error) {
-        console.error('❌ Contract verification failed:', error);
-        throw error;
-      }
-      
-      // Ensure all parameters are properly formatted
-      const safeUsername = username ? username.toString().slice(0, 31) : 'anonymous';
-      const safeFid = fid ? Number(fid) : 0;
-      
-      console.log('📝 Contract call parameters:', {
-        contractAddress: CONTRACT_ADDRESS,
-        scoreInSeconds,
-        puzzleId,
-        safeUsername,
-        safeFid
-      });
 
-      // Multiple strategies to call Base contract
-      console.log('🔗 Attempting multiple transaction strategies for Base contract...');
+      // Create ethers provider and signer
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+
+      // Define contract ABI for the submitScore function
+      const contractABI = [
+        "function submitScore(uint256 time, uint256 puzzleId, string memory username, uint256 fid) external"
+      ];
+
+      // Create contract instance
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer);
+
+      // Call the contract function with proper parameters
+      console.log('📦 Calling contract function...');
+      const tx = await contract.submitScore(scoreInSeconds, puzzleId, username, fid);
       
-      let txHash;
-      let success = false;
+      console.log('✅ Transaction sent:', tx.hash);
       
-      // Strategy 1: Try simple transfer with data (most Base contracts accept this)
-      try {
-        console.log('📝 Strategy 1: Simple transfer with score data...');
-        
-        // Encode score data as simple hex
-        const scoreData = `0x${scoreInSeconds.toString(16).padStart(8, '0')}${puzzleId.toString(16).padStart(8, '0')}`;
-        
-        txHash = await sendTransaction({
-          to: CONTRACT_ADDRESS,
-          value: 1000000000000000n, // 0.001 ETH - small amount that Base contracts often require
-          data: scoreData,
-        });
-        
-        console.log('✅ Strategy 1 successful:', txHash);
-        success = true;
-        
-      } catch (error1) {
-        console.log('⚠️ Strategy 1 failed:', error1.message);
-        
-        // Strategy 2: Try your function selector but with value
-        try {
-          console.log('📝 Strategy 2: Function call with value...');
-          
-          const SUBMIT_SCORE_SELECTOR = process.env.REACT_APP_SUBMIT_SCORE_FUNCTION_SELECTOR || '0x9d6e367a';
-          
-          txHash = await sendTransaction({
-            to: CONTRACT_ADDRESS,
-            value: 1000000000000000n, // 0.001 ETH
-            data: SUBMIT_SCORE_SELECTOR + 
-                  scoreInSeconds.toString(16).padStart(64, '0') +
-                  puzzleId.toString(16).padStart(64, '0'),
-          });
-          
-          console.log('✅ Strategy 2 successful:', txHash);
-          success = true;
-          
-        } catch (error2) {
-          console.log('⚠️ Strategy 2 failed:', error2.message);
-          
-          // Strategy 3: Try minimal function call
-          try {
-            console.log('📝 Strategy 3: Minimal function call...');
-            
-            txHash = await writeContract({
-              address: CONTRACT_ADDRESS,
-              value: 1000000000000000n, // 0.001 ETH
-              abi: [
-                {
-                  type: 'function',
-                  name: 'submit',
-                  inputs: [
-                    { name: 'data', type: 'uint256' }
-                  ],
-                  outputs: [],
-                  stateMutability: 'payable'
-                }
-              ],
-              functionName: 'submit',
-              args: [
-                // eslint-disable-next-line no-undef
-                BigInt(scoreInSeconds)
-              ]
-            });
-            
-            console.log('✅ Strategy 3 successful:', txHash);
-            success = true;
-            
-          } catch (error3) {
-            console.log('⚠️ Strategy 3 failed:', error3.message);
-            
-            // Strategy 4: Just send ETH with data (fallback)
-            try {
-              console.log('📝 Strategy 4: ETH transfer with encoded data...');
-              
-              const dataString = `InflyncedPuzzle:${scoreInSeconds}:${puzzleId}:${safeUsername}:${safeFid}`;
-              const encodedData = '0x' + Array.from(dataString).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-              
-              txHash = await sendTransaction({
-                to: CONTRACT_ADDRESS,
-                value: 10000000000000000n, // 0.01 ETH
-                data: encodedData,
-              });
-              
-              console.log('✅ Strategy 4 successful:', txHash);
-              success = true;
-              
-            } catch (error4) {
-              console.log('❌ All strategies failed');
-              throw new Error(`All transaction strategies failed. Contract might require specific conditions or different function signatures. Last error: ${error4.message}`);
-            }
-          }
-        }
-      }
+      // Wait for confirmation
+      console.log('⏳ Waiting for confirmation...');
+      const receipt = await tx.wait();
       
-      if (!success) {
-        throw new Error('Unable to submit transaction to Base contract');
-      }
+      console.log('✅ Transaction confirmed:', receipt);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
       
-      console.log('✅ Transaction sent:', txHash);
-      
-      // Safely handle transaction hash display
-      const displayHash = txHash && typeof txHash === 'string' ? txHash : 'Transaction submitted';
-      const shortHash = displayHash.length > 10 ? displayHash.slice(0, 10) + '...' : displayHash;
-      
-      alert(`Score submitted onchain! 🎉\n\nTransaction: ${shortHash}\n\nView on Basescan: https://basescan.org/tx/${displayHash}`);
-      
-      // Wait a bit then reload leaderboard
       setTimeout(() => {
         loadOnchainLeaderboard();
-      }, 5000);
+      }, 3000);
       
     } catch (error) {
       console.error('❌ Onchain submission failed:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        data: error.data,
-        stack: error.stack
-      });
       
-      if (error.code === 4001) {
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
         alert('Transaction cancelled by user');
-      } else if (error.code === -32602) {
-        alert('Invalid transaction parameters. Please check contract address and function selector.');
-      } else if (error.message.includes('slice')) {
-        alert('Parameter formatting error. Please try again.');
       } else if (error.message.includes('revert')) {
-        alert('Transaction reverted. The contract may not exist or function is incorrect.');
+        alert('Contract rejected the transaction:\n• Check if you have enough ETH for gas\n• Verify contract function exists\n• Ensure parameters are valid');
+      } else if (error.message.includes('insufficient funds')) {
+        alert('Insufficient ETH for gas fees. Please add ETH to your wallet.');
       } else {
-        alert(`Transaction failed: ${error.message || 'Unknown error'}`);
+        alert('Transaction failed: ' + error.message);
       }
     } finally {
       setIsSubmittingOnchain(false);
