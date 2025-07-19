@@ -51,7 +51,7 @@ const InflyncedPuzzle = () => {
   // Wagmi hooks for wallet connection
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
-  // const { sendTransaction } = useSendTransaction(); // Not used in contract mode
+  const { sendTransaction } = useSendTransaction(); // Used as fallback method
   const { writeContract } = useWriteContract();
   const publicClient = usePublicClient();
   
@@ -278,34 +278,65 @@ const InflyncedPuzzle = () => {
         safeFid
       });
 
-      // Call your contract's submitScore function
-      const txHash = await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: [
-          {
-            type: 'function',
-            name: 'submitScore',
-            inputs: [
-              { name: 'score', type: 'uint256' },
-              { name: 'puzzleId', type: 'uint256' }, 
-              { name: 'username', type: 'string' },
-              { name: 'fid', type: 'uint256' }
-            ],
-            outputs: [],
-            stateMutability: 'nonpayable'
-          }
-        ],
-        functionName: 'submitScore',
-        args: [
-          // eslint-disable-next-line no-undef
-          BigInt(scoreInSeconds),
-          // eslint-disable-next-line no-undef 
-          BigInt(puzzleId),
-          safeUsername,
-          // eslint-disable-next-line no-undef
-          BigInt(safeFid)
-        ]
-      });
+      // Call your contract using the selector from .env
+      const SUBMIT_SCORE_SELECTOR = process.env.REACT_APP_SUBMIT_SCORE_FUNCTION_SELECTOR || '0x9d6e367a';
+      
+      console.log('📞 Calling contract with selector:', SUBMIT_SCORE_SELECTOR);
+      
+      // Try different function signatures based on your contract
+      let txHash;
+      
+      try {
+        // First try: your custom function signature
+        console.log('🔧 Trying custom function signature...');
+        
+        // Use your exact selector with minimal parameters
+        const result = await publicClient.call({
+          to: CONTRACT_ADDRESS,
+          data: SUBMIT_SCORE_SELECTOR + 
+                // Score (uint256 - 32 bytes)
+                scoreInSeconds.toString(16).padStart(64, '0') +
+                // Puzzle ID (uint256 - 32 bytes) 
+                puzzleId.toString(16).padStart(64, '0'),
+        });
+        
+        console.log('✅ Contract call successful!', result);
+        
+        // If call succeeds, send as transaction
+        txHash = await sendTransaction({
+          to: CONTRACT_ADDRESS,
+          data: SUBMIT_SCORE_SELECTOR + 
+                scoreInSeconds.toString(16).padStart(64, '0') +
+                puzzleId.toString(16).padStart(64, '0'),
+        });
+        
+      } catch (error) {
+        console.log('⚠️ Custom function failed, trying fallback...', error.message);
+        
+        // Fallback: try wagmi writeContract with different ABI
+        txHash = await writeContract({
+          address: CONTRACT_ADDRESS,
+          abi: [
+            {
+              type: 'function',
+              name: 'submitScore',
+              inputs: [
+                { name: 'score', type: 'uint256' },
+                { name: 'puzzleId', type: 'uint256' }
+              ],
+              outputs: [],
+              stateMutability: 'nonpayable'
+            }
+          ],
+          functionName: 'submitScore',
+          args: [
+            // eslint-disable-next-line no-undef
+            BigInt(scoreInSeconds),
+            // eslint-disable-next-line no-undef 
+            BigInt(puzzleId)
+          ]
+        });
+      }
       
       console.log('✅ Transaction sent:', txHash);
       
