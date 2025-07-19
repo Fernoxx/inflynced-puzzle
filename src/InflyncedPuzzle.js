@@ -268,19 +268,52 @@ const InflyncedPuzzle = () => {
       
       console.log('📝 Farcaster wallet connected:', await signer.getAddress());
 
-      // SIMPLE SOLUTION: Just send transaction data without ETH value
-      console.log('📦 Sending simple transaction with score data...');
+      // MULTI-STRATEGY CONTRACT CALLS
+      console.log('📦 Trying multiple contract function signatures...');
       
-      // Create simple data payload
-      const scoreData = `${scoreInSeconds.toString(16).padStart(8, '0')}${puzzleId.toString(16).padStart(8, '0')}`;
+      let tx;
+      let success = false;
       
-      // Send basic transaction with minimal gas
-      const tx = await signer.sendTransaction({
-        to: CONTRACT_ADDRESS,
-        value: 0, // NO ETH transfer - just gas
-        data: '0x' + scoreData,
-        gasLimit: 21000 // Minimal gas for simple transaction
-      });
+      // Strategy 1: Simple submitScore(uint256,uint256)
+      try {
+        console.log('🎯 Strategy 1: submitScore(time, puzzleId)...');
+        const abi1 = ["function submitScore(uint256 time, uint256 puzzleId) external"];
+        const contract1 = new ethers.Contract(CONTRACT_ADDRESS, abi1, signer);
+        tx = await contract1.submitScore(scoreInSeconds, puzzleId, { gasLimit: 100000 });
+        success = true;
+        console.log('✅ Strategy 1 WORKED!');
+      } catch (error1) {
+        console.log('❌ Strategy 1 failed:', error1.message);
+        
+        // Strategy 2: submitScore(uint256,string)
+        try {
+          console.log('🎯 Strategy 2: submitScore(time, username)...');
+          const abi2 = ["function submitScore(uint256 time, string memory username) external"];
+          const contract2 = new ethers.Contract(CONTRACT_ADDRESS, abi2, signer);
+          tx = await contract2.submitScore(scoreInSeconds, username, { gasLimit: 100000 });
+          success = true;
+          console.log('✅ Strategy 2 WORKED!');
+        } catch (error2) {
+          console.log('❌ Strategy 2 failed:', error2.message);
+          
+          // Strategy 3: Full signature
+          try {
+            console.log('🎯 Strategy 3: Full submitScore...');
+            const abi3 = ["function submitScore(uint256 time, uint256 puzzleId, string memory username, uint256 fid) external"];
+            const contract3 = new ethers.Contract(CONTRACT_ADDRESS, abi3, signer);
+            tx = await contract3.submitScore(scoreInSeconds, puzzleId, username, fid, { gasLimit: 150000 });
+            success = true;
+            console.log('✅ Strategy 3 WORKED!');
+          } catch (error3) {
+            console.log('❌ Strategy 3 failed:', error3.message);
+            throw new Error(`All contract strategies failed:\n1: ${error1.message}\n2: ${error2.message}\n3: ${error3.message}`);
+          }
+        }
+      }
+      
+      if (!success) {
+        throw new Error('Contract call failed - check function exists and has correct signature');
+      }
       
       console.log('✅ Transaction sent:', tx.hash);
       
