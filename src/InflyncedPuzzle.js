@@ -50,7 +50,7 @@ const InflyncedPuzzle = () => {
   
   // Wagmi hooks for wallet connection
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connectAsync, connectors } = useConnect();
   const { writeContract } = useWriteContract();
   const publicClient = usePublicClient();
   
@@ -157,6 +157,17 @@ const InflyncedPuzzle = () => {
       console.log('🔗 Connecting Farcaster wallet with wagmi...');
       console.log('🔍 Available connectors:', connectors);
       
+      // Initialize Farcaster SDK context first
+      try {
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        await sdk.ready();
+        const context = await sdk.context;
+        console.log('✅ Farcaster SDK ready, context:', context);
+      } catch (sdkError) {
+        console.warn('⚠️ Farcaster SDK initialization issue:', sdkError);
+        // Continue anyway as connector might work
+      }
+      
       // Check if we're in Farcaster environment
       if (!isInFarcaster) {
         throw new Error('This miniapp must be used within Farcaster mobile app.');
@@ -172,23 +183,30 @@ const InflyncedPuzzle = () => {
       }
       
       console.log('📱 Using Farcaster wagmi connector:', farcasterConnector.name);
+      console.log('📱 Connector details:', farcasterConnector);
       
-      // Connect using wagmi
-      await connect({ connector: farcasterConnector });
+      // Connect using wagmi connectAsync for better error handling
+      const result = await connectAsync({ connector: farcasterConnector });
       
-      console.log('✅ Farcaster wallet connected via wagmi');
+      console.log('✅ Farcaster wallet connected via wagmi:', result);
       
     } catch (error) {
       console.error('❌ Farcaster wallet connection failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        cause: error.cause
+      });
       
-      if (error.code === 4001) {
-        alert('Wallet connection cancelled by user');
+      if (error.code === 4001 || error.message.includes('rejected')) {
+        alert('❌ Connection cancelled. Please try again and approve the wallet connection request.');
       } else if (error.message.includes('must be used within Farcaster')) {
         alert('⚠️ This miniapp requires Farcaster mobile app\n\nPlease open this miniapp in Farcaster mobile to use the built-in wallet features.');
       } else if (error.message.includes('not found') || error.message.includes('connector')) {
         alert('⚠️ Farcaster wallet connector not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
       } else {
-        alert('Failed to connect Farcaster wallet: ' + error.message);
+        alert(`❌ Failed to connect Farcaster wallet: ${error.message}`);
       }
     }
   };
@@ -234,18 +252,10 @@ const InflyncedPuzzle = () => {
         throw new Error('Wallet not connected via wagmi');
       }
       
-      // Verify contract exists at address using wagmi
-      try {
-        const code = await publicClient.getCode({ address: CONTRACT_ADDRESS });
-        
-        if (!code || code === '0x') {
-          throw new Error(`No contract found at address ${CONTRACT_ADDRESS} on Base chain. Please verify the contract address.`);
-        }
-        console.log('✅ Contract verified at address:', CONTRACT_ADDRESS);
-      } catch (codeError) {
-        console.error('❌ Contract verification failed:', codeError);
-        throw codeError;
-      }
+      // Temporarily skip contract verification to test transaction
+      console.log('📝 Using contract address:', CONTRACT_ADDRESS);
+      console.log('🔗 Connected wallet:', walletAddress);
+      console.log('⛓️ Target chain: Base (8453)');
       
       // Use wagmi writeContract for better error handling and UX
       console.log('📝 Submitting contract write transaction...');

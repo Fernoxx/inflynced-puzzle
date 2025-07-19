@@ -5,9 +5,17 @@ import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 export const wagmiConfig = createConfig({
   chains: [base],
   connectors: [
-    farcasterMiniApp(),
+    farcasterMiniApp({
+      // Add proper Farcaster miniapp configuration
+      metadata: {
+        name: 'InflyncedPuzzle',
+        description: 'Onchain puzzle game on Farcaster',
+        url: 'https://inflyncedpuzzle.vercel.app',
+        icons: ['https://inflyncedpuzzle.vercel.app/favicon.ico'],
+      },
+    }),
   ],
   transports: {
-    [base.id]: http(),
+    [base.id]: http('https://mainnet.base.org'),
   },
 });
