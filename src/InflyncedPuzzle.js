@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useSendTransaction } from 'wagmi';
+import { useAccount, useConnect, useSendTransaction, useWriteContract, usePublicClient } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -26,10 +26,10 @@ const IMAGE_PUZZLES = [
   { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
-// Contract configuration for Base chain (keeping for future use)
-// const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e";
+// Contract configuration for Base chain - USER'S ACTUAL CONTRACT
+const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e"; // Replace with your actual contract
 const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
-// const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
+const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
 const InflyncedPuzzle = () => {
   const [gameState, setGameState] = useState('menu');
@@ -51,7 +51,9 @@ const InflyncedPuzzle = () => {
   // Wagmi hooks for wallet connection
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
-  const { sendTransaction } = useSendTransaction();
+  // const { sendTransaction } = useSendTransaction(); // Not used in contract mode
+  const { writeContract } = useWriteContract();
+  const publicClient = usePublicClient();
   
   // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
@@ -236,7 +238,8 @@ const InflyncedPuzzle = () => {
         throw new Error('Invalid puzzle ID');
       }
       
-      console.log('📝 Submitting score:', {
+            console.log('📝 Submitting score to YOUR contract:', {
+        contract: CONTRACT_ADDRESS,
         time: scoreInSeconds,
         puzzleId: puzzleId,
         username: username,
@@ -244,40 +247,64 @@ const InflyncedPuzzle = () => {
         chainId: DEFAULT_CHAIN_ID,
         walletAddress: walletAddress
       });
-      
+
       // Use wagmi for provider
       if (!walletConnected || !walletAddress) {
         throw new Error('Wallet not connected via wagmi');
       }
       
-      // Simple transaction approach - store score data in transaction metadata
-      console.log('📝 Using simple sendTransaction approach');
-      console.log('🔗 Connected wallet:', walletAddress);
-      console.log('⛓️ Target chain: Base (8453)');
+      // First, let's verify your contract exists
+      console.log('🔍 Checking if contract exists at:', CONTRACT_ADDRESS);
+      try {
+        const code = await publicClient.getCode({ address: CONTRACT_ADDRESS });
+        if (!code || code === '0x') {
+          throw new Error(`❌ NO CONTRACT found at ${CONTRACT_ADDRESS}!\n\n🚨 You need to:\n1. Deploy your contract to Base\n2. Update CONTRACT_ADDRESS in the code\n3. Or set REACT_APP_CONTRACT_ADDRESS env variable`);
+        }
+        console.log('✅ Contract found at address:', CONTRACT_ADDRESS);
+      } catch (error) {
+        console.error('❌ Contract verification failed:', error);
+        throw error;
+      }
       
       // Ensure all parameters are properly formatted
       const safeUsername = username ? username.toString().slice(0, 31) : 'anonymous';
       const safeFid = fid ? Number(fid) : 0;
       
-      console.log('📝 Transaction parameters:', {
+      console.log('📝 Contract call parameters:', {
+        contractAddress: CONTRACT_ADDRESS,
         scoreInSeconds,
         puzzleId,
         safeUsername,
         safeFid
       });
 
-      // Create simple transaction data with score information
-      const scoreData = `InflyncedPuzzle-Score:${scoreInSeconds}-Puzzle:${puzzleId}-User:${safeUsername}-FID:${safeFid}`;
-      
-      // Convert to hex data (simple encoding)
-      const data = '0x' + Array.from(scoreData).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-      console.log('📝 Score data encoded:', data);
-
-      // Send simple transaction with minimal value to pay gas
-      const txHash = await sendTransaction({
-        to: walletAddress, // Send to self 
-        value: 1n, // Minimal wei transfer (just to make transaction valid)
-        data: data
+      // Call your contract's submitScore function
+      const txHash = await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: [
+          {
+            type: 'function',
+            name: 'submitScore',
+            inputs: [
+              { name: 'score', type: 'uint256' },
+              { name: 'puzzleId', type: 'uint256' }, 
+              { name: 'username', type: 'string' },
+              { name: 'fid', type: 'uint256' }
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable'
+          }
+        ],
+        functionName: 'submitScore',
+        args: [
+          // eslint-disable-next-line no-undef
+          BigInt(scoreInSeconds),
+          // eslint-disable-next-line no-undef 
+          BigInt(puzzleId),
+          safeUsername,
+          // eslint-disable-next-line no-undef
+          BigInt(safeFid)
+        ]
       });
       
       console.log('✅ Transaction sent:', txHash);
@@ -328,10 +355,31 @@ const InflyncedPuzzle = () => {
       // Try to read from blockchain using wagmi
       let leaderboardData = [];
       
-      // Since we're using simple transactions, we'll show empty leaderboard for now
-      // TODO: In future, scan blockchain for transactions with our score data
-      console.log('📊 Simple transaction mode - no complex contract calls needed');
-      console.log('⚠️ Leaderboard shows empty until transaction scanning is implemented');
+      // Read leaderboard from YOUR contract
+      if (publicClient && walletConnected) {
+        try {
+          console.log('📖 Reading leaderboard from YOUR contract:', CONTRACT_ADDRESS);
+          
+          const result = await publicClient.call({
+            to: CONTRACT_ADDRESS,
+            data: GET_LEADERBOARD_SELECTOR
+          });
+          
+          console.log('📊 Contract leaderboard response:', result);
+          
+          if (result && result !== '0x') {
+            console.log('✅ Got data from contract - need to parse based on your contract ABI');
+            // TODO: Parse based on your actual contract's return format
+            // leaderboardData = parseYourContractData(result);
+          } else {
+            console.log('⚠️ Contract returned empty leaderboard');
+          }
+          
+        } catch (contractError) {
+          console.log('❌ Contract leaderboard call failed:', contractError);
+          console.log('💡 Make sure your contract has the getLeaderboard function');
+        }
+      }
       
       setSharedLeaderboard(leaderboardData);
       console.log('✅ Leaderboard loaded with', leaderboardData.length, 'entries');
@@ -342,7 +390,7 @@ const InflyncedPuzzle = () => {
     } finally {
       setIsLoadingLeaderboard(false);
     }
-  }, []); // Removed unnecessary dependencies
+  }, [publicClient, walletConnected]); // Dependencies for contract calls
 
   // FIXED: Share result with proper miniapp embed
   const shareResult = useCallback(async () => {
