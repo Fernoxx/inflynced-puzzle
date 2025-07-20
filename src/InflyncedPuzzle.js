@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useContractWrite, useContractRead, useDisconnect, usePublicClient } from 'wagmi';
+import { useAccount, useConnect, useContractWrite, useContractRead, useDisconnect, usePublicClient, useWaitForTransaction } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
 
@@ -66,8 +66,26 @@ const InflyncedPuzzle = () => {
   const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
 
-  // For now, we'll keep the ethers.js approach and add Wagmi gradually
-  // TODO: Implement proper Wagmi contract hooks in next update
+  // Wagmi contract read hook for leaderboard
+  const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useContractRead({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getTopScores',
+    args: [50], // Get top 50 scores
+    enabled: true,
+  });
+
+  // Wagmi contract write hook for submitting scores
+  const { data: submitTxData, write: submitScore, isLoading: isSubmittingWagmi } = useContractWrite({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'submitScore',
+  });
+
+  // Wait for transaction confirmation
+  const { isLoading: isWaitingForTx, isSuccess: isTxSuccess } = useWaitForTransaction({
+    hash: submitTxData?.hash,
+  });
   
   // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
@@ -77,6 +95,27 @@ const InflyncedPuzzle = () => {
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
   const snowflakesRef = useRef([]);
+
+  // Handle Wagmi transaction success
+  useEffect(() => {
+    if (isTxSuccess && submitTxData?.hash) {
+      console.log('✅ WAGMI Transaction confirmed:', submitTxData.hash);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${submitTxData.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${submitTxData.hash}`);
+      
+      // Refresh leaderboard
+      setTimeout(() => {
+        refetchLeaderboard();
+      }, 3000);
+    }
+  }, [isTxSuccess, submitTxData, refetchLeaderboard]);
+
+  // Update onchain leaderboard when data changes
+  useEffect(() => {
+    if (onchainLeaderboardData) {
+      console.log('📊 WAGMI Leaderboard data:', onchainLeaderboardData);
+      setOnchainLeaderboard(onchainLeaderboardData);
+    }
+  }, [onchainLeaderboardData]);
 
   useEffect(() => {
     try {
@@ -234,9 +273,36 @@ const InflyncedPuzzle = () => {
 
 
 
-  // Submit score onchain using Wagmi
+  // New Wagmi-based submit function
+  const submitScoreWithWagmi = (time, puzzleId) => {
+    console.log('🔥 WAGMI: submitScore called with proper RPC:', { time, puzzleId });
+    
+    if (!walletConnected || !walletAddress) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const scoreInSeconds = Math.floor(time / 1000);
+    const username = userProfile?.username || userProfile?.displayName || 'anonymous';
+    const fid = userProfile?.fid || 0;
+
+    console.log('📝 WAGMI submitting score:', {
+      contract: CONTRACT_ADDRESS,
+      time: scoreInSeconds,
+      puzzleId: puzzleId,
+      username: username,
+      fid: fid
+    });
+
+    // Use Wagmi's write function
+    submitScore({
+      args: [scoreInSeconds, username, puzzleId, fid],
+    });
+  };
+
+  // Legacy ethers.js submit function (fallback)
   const submitScoreOnchain = async (time, puzzleId) => {
-    console.log('🔴 DEBUG: submitScoreOnchain called with Wagmi:', { time, puzzleId });
+    console.log('🔴 DEBUG: submitScoreOnchain called with ethers fallback:', { time, puzzleId });
     console.log('🔴 DEBUG: walletConnected:', walletConnected);
     console.log('🔴 DEBUG: walletAddress:', walletAddress);
     
@@ -1365,12 +1431,12 @@ const InflyncedPuzzle = () => {
                   </p>
                   <button
                     onClick={() => {
-                      console.log('🔴 DEBUG: Save Onchain button clicked!');
-                      console.log('🔴 DEBUG: totalTime:', totalTime);
-                      console.log('🔴 DEBUG: currentPuzzle?.id:', currentPuzzle?.id);
-                      submitScoreOnchain(totalTime, currentPuzzle?.id);
+                      console.log('🔥 WAGMI: Save Onchain button clicked!');
+                      console.log('🔥 WAGMI: totalTime:', totalTime);
+                      console.log('🔥 WAGMI: currentPuzzle?.id:', currentPuzzle?.id);
+                      submitScoreWithWagmi(totalTime, currentPuzzle?.id);
                     }}
-                    disabled={isSubmittingOnchain}
+                    disabled={isSubmittingWagmi || isWaitingForTx}
                     style={{
                       backgroundColor: '#8B5CF6',
                       color: 'white',
@@ -1379,11 +1445,11 @@ const InflyncedPuzzle = () => {
                       fontWeight: '600',
                       fontSize: '12px',
                       border: 'none',
-                      cursor: isSubmittingOnchain ? 'not-allowed' : 'pointer',
-                      opacity: isSubmittingOnchain ? 0.7 : 1
+                      cursor: (isSubmittingWagmi || isWaitingForTx) ? 'not-allowed' : 'pointer',
+                      opacity: (isSubmittingWagmi || isWaitingForTx) ? 0.7 : 1
                     }}
                   >
-                    {isSubmittingOnchain ? 'Submitting...' : '⛓️ Save Onchain'}
+                    {isSubmittingWagmi ? 'Signing...' : isWaitingForTx ? 'Confirming...' : '⛓️ Save Onchain'}
                   </button>
                 </div>
               )}
