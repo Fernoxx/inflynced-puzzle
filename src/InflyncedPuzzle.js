@@ -122,18 +122,33 @@ const InflyncedPuzzle = () => {
     }
   }, [onchainLeaderboardData]);
 
-  // Initialize Farcaster SDK
+  // Initialize Farcaster SDK FIRST - this is critical
   useEffect(() => {
     const initFarcaster = async () => {
       try {
         console.log('🔗 Initializing Farcaster SDK...');
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        await sdk.ready();
+        
+        // MUST call ready() first to dismiss splash screen
+        await sdk.actions.ready();
+        console.log('✅ SDK ready() called - splash screen dismissed');
+        
+        // Now get context
         const context = await sdk.context;
         console.log('✅ Farcaster SDK initialized:', context);
-        setUserProfile(context.user);
+        
+        if (context?.user) {
+          setUserProfile(context.user);
+          setIsInFarcaster(true);
+        } else {
+          console.log('❌ No user context - not in Farcaster');
+          setIsInFarcaster(false);
+        }
+        
+        setSdkInstance(sdk);
       } catch (error) {
         console.error('❌ Farcaster SDK initialization failed:', error);
+        setIsInFarcaster(false);
       }
     };
     
@@ -176,99 +191,39 @@ const InflyncedPuzzle = () => {
     }
   }, [createNewProfile]);
 
-  // Initialize Farcaster SDK with proper wallet detection
+  // Set loading state when SDK is ready
   useEffect(() => {
-    const initializeFarcasterWallet = async () => {
-      try {
-        console.log('🔄 Initializing Farcaster miniapp...');
-        
-        // Import latest Farcaster SDK
-        const { sdk } = await import('@farcaster/miniapp-sdk');
-        setSdkInstance(sdk);
-        
-        console.log('📋 Latest SDK loaded successfully');
-        
-        // CRITICAL: Call ready() first
-        await sdk.actions.ready();
-        console.log('✅ SDK ready() called');
-        
-        // Get context with latest API
-        const context = await sdk.context;
-        console.log('📱 Farcaster context:', context);
-        
-        if (context?.user) {
-          const userProfile = {
-            fid: context.user.fid,
-            username: context.user.username,
-            displayName: context.user.displayName,
-            pfpUrl: context.user.pfpUrl
-          };
-          setUserProfile(userProfile);
-          setIsInFarcaster(true);
-          console.log('✅ Farcaster user profile:', userProfile);
-          
-          // Note: Wallet connection now handled by wagmi
-          console.log('ℹ️ Wallet connection will be handled by wagmi when user clicks connect');
-          
-        } else {
-          console.log('❌ No Farcaster user context');
-          setIsInFarcaster(false);
-          getFallbackUserProfile();
-        }
-        
-        setIsLoading(false);
-        
-      } catch (error) {
-        console.error('❌ Farcaster initialization failed:', error);
-        setIsInFarcaster(false);
-        getFallbackUserProfile();
-        setIsLoading(false);
-      }
-    };
-
-    initializeFarcasterWallet();
-  }, [getFallbackUserProfile]);
+    if (sdkInstance) {
+      setIsLoading(false);
+    }
+  }, [sdkInstance]);
 
   // Connect wallet using wagmi and Farcaster connector
   const connectWallet = async () => {
     try {
-      console.log('🔗 Connecting Farcaster wallet with wagmi...');
-      console.log('🔍 Available connectors:', connectors);
-      
-      // Initialize Farcaster SDK context first - REQUIRED
-      try {
-        const { sdk } = await import('@farcaster/miniapp-sdk');
-        await sdk.ready();
-        const context = await sdk.context;
-        console.log('✅ Farcaster SDK ready, context:', context);
-        
-        // Ensure we're in Farcaster environment
-        if (!context || !context.user) {
-          throw new Error('Not running in Farcaster environment');
-        }
-      } catch (sdkError) {
-        console.error('❌ Farcaster SDK initialization failed:', sdkError);
-        throw new Error('This app must be used within Farcaster mobile app');
-      }
+      console.log('🔗 Connecting Farcaster wallet...');
       
       // Check if we're in Farcaster environment
-      if (!isInFarcaster) {
+      if (!isInFarcaster || !sdkInstance) {
         throw new Error('This miniapp must be used within Farcaster mobile app.');
       }
       
+      console.log('🔍 Available connectors:', connectors);
+      
       // Find the Farcaster connector
       const farcasterConnector = connectors.find(connector => 
-        connector.id === 'farcasterMiniApp' || connector.name?.includes('Farcaster')
+        connector.id === 'farcasterMiniApp' || 
+        connector.id === 'farcaster' ||
+        connector.name?.includes('Farcaster')
       );
       
       if (!farcasterConnector) {
         throw new Error('Farcaster connector not found. Please ensure you are using the latest version of Farcaster mobile app.');
       }
       
-      console.log('📱 Using Farcaster wagmi connector:', farcasterConnector.name);
-      console.log('📱 Connector details:', farcasterConnector);
+      console.log('📱 Using Farcaster connector:', farcasterConnector.name || farcasterConnector.id);
       
-      // Connect using wagmi connectAsync for better error handling
+      // Connect using wagmi connectAsync
       const result = await connectAsync({ connector: farcasterConnector });
       
       console.log('✅ Farcaster wallet connected via wagmi:', result);
@@ -296,15 +251,15 @@ const InflyncedPuzzle = () => {
 
 
 
-    // Direct Farcaster SDK approach (skip Wagmi for now)
+  // Proper Farcaster SDK approach with Ethereum wallet
   const submitScoreWithWagmi = async (time, puzzleId) => {
-    console.log('🔥 DIRECT: Using Farcaster SDK directly for transaction:', { time, puzzleId });
+    console.log('🔥 FARCASTER SDK: Using wallet provider for transaction:', { time, puzzleId });
     
     const scoreInSeconds = Math.floor(time / 1000);
     const username = userProfile?.username || userProfile?.displayName || 'anonymous';
     const fid = userProfile?.fid || 0;
 
-    console.log('📝 DIRECT submitting score:', {
+    console.log('📝 Submitting score via Farcaster wallet:', {
       contract: CONTRACT_ADDRESS,
       time: scoreInSeconds,
       puzzleId: puzzleId,
@@ -312,22 +267,30 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
+    // Ensure we're in Farcaster environment
+    if (!isInFarcaster || !sdkInstance) {
+      alert('❌ This app must be used within Farcaster mobile app');
+      return;
+    }
+
     try {
-      console.log('🔥 Getting Farcaster provider directly...');
-      const { sdk } = await import('@farcaster/miniapp-sdk');
-      const farcasterProvider = sdk.wallet.ethProvider;
+      console.log('🔥 Getting Farcaster wallet provider...');
       
-      if (!farcasterProvider) {
-        throw new Error('❌ Farcaster wallet not available. Please use this app inside Farcaster mobile app.');
+      // Use the SDK instance we already have
+      const walletProvider = await sdkInstance.wallet.getEthereumProvider();
+      
+      if (!walletProvider) {
+        throw new Error('❌ Farcaster wallet not available. Please ensure you have a wallet connected in Farcaster.');
       }
 
-      console.log('✅ Using Farcaster wallet provider directly');
-      const ethersProvider = new ethers.BrowserProvider(farcasterProvider);
+      console.log('✅ Using Farcaster wallet provider');
+      const ethersProvider = new ethers.BrowserProvider(walletProvider);
       const signer = await ethersProvider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       
-      console.log('📝 Farcaster wallet connected:', await signer.getAddress());
-      console.log('🔥 Calling contract.submitScore directly...');
+      const signerAddress = await signer.getAddress();
+      console.log('📝 Farcaster wallet address:', signerAddress);
+      console.log('🔥 Calling contract.submitScore...');
       
       const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
         gasLimit: 200000,
@@ -348,11 +311,13 @@ const InflyncedPuzzle = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('❌ Direct transaction failed:', error);
+      console.error('❌ Transaction failed:', error);
       if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
         alert('Transaction cancelled by user');
       } else if (error.message.includes('insufficient funds')) {
         alert('❌ Insufficient ETH for gas fees on Base network.\n\n💡 You need a small amount of ETH on Base to pay gas fees.');
+      } else if (error.message.includes('user rejected')) {
+        alert('Transaction was rejected by user');
       } else {
         alert('❌ Transaction failed: ' + error.message);
       }
