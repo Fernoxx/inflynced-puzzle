@@ -296,34 +296,15 @@ const InflyncedPuzzle = () => {
 
 
 
-  // New Wagmi-based submit function
+    // Direct Farcaster SDK approach (skip Wagmi for now)
   const submitScoreWithWagmi = async (time, puzzleId) => {
-    console.log('🔥 WAGMI: submitScore called with proper RPC:', { time, puzzleId });
+    console.log('🔥 DIRECT: Using Farcaster SDK directly for transaction:', { time, puzzleId });
     
-    if (!walletConnected || !walletAddress) {
-      console.log('🔗 Wallet not connected, attempting to connect...');
-      try {
-        // Get Farcaster connector
-        const farcasterConnector = connectors.find(c => c.id === 'farcaster');
-        if (farcasterConnector) {
-          await connectAsync({ connector: farcasterConnector });
-          console.log('✅ Farcaster wallet connected');
-        } else {
-          alert('Farcaster connector not found. Please ensure you are in Farcaster mobile app.');
-          return;
-        }
-      } catch (error) {
-        console.error('❌ Failed to connect wallet:', error);
-        alert('Failed to connect wallet: ' + error.message);
-        return;
-      }
-    }
-
     const scoreInSeconds = Math.floor(time / 1000);
     const username = userProfile?.username || userProfile?.displayName || 'anonymous';
     const fid = userProfile?.fid || 0;
 
-    console.log('📝 WAGMI submitting score:', {
+    console.log('📝 DIRECT submitting score:', {
       contract: CONTRACT_ADDRESS,
       time: scoreInSeconds,
       puzzleId: puzzleId,
@@ -331,47 +312,51 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
-         // Use Wagmi v2's writeContract function with fallback
-     try {
-       console.log('🔥 Calling writeContract...');
-       submitScore({
-         address: CONTRACT_ADDRESS,
-         abi: CONTRACT_ABI,
-         functionName: 'submitScore',
-         args: [scoreInSeconds, username, puzzleId, fid],
-         chainId: base.id, // Explicitly set chain ID
-       });
-       console.log('✅ writeContract called successfully');
-     } catch (wagmiError) {
-       console.error('❌ Wagmi writeContract failed:', wagmiError);
-       console.log('🔄 Falling back to ethers.js method...');
-       
-       // Fallback to direct ethers.js call
-       try {
-         const { sdk } = await import('@farcaster/miniapp-sdk');
-         const farcasterProvider = sdk.wallet.ethProvider;
-         
-         if (!farcasterProvider) {
-           throw new Error('Farcaster wallet provider not available');
-         }
+    try {
+      console.log('🔥 Getting Farcaster provider directly...');
+      const { sdk } = await import('@farcaster/miniapp-sdk');
+      const farcasterProvider = sdk.wallet.ethProvider;
+      
+      if (!farcasterProvider) {
+        throw new Error('❌ Farcaster wallet not available. Please use this app inside Farcaster mobile app.');
+      }
 
-         const ethersProvider = new ethers.BrowserProvider(farcasterProvider);
-         const signer = await ethersProvider.getSigner();
-         const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-         
-         console.log('🔥 Using ethers.js fallback...');
-         const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
-           gasLimit: 200000,
-         });
-         
-         console.log('✅ Ethers.js transaction sent:', tx.hash);
-         alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
-         
-       } catch (ethersError) {
-         console.error('❌ Ethers.js fallback also failed:', ethersError);
-         alert('Transaction failed: ' + ethersError.message);
-       }
-     }
+      console.log('✅ Using Farcaster wallet provider directly');
+      const ethersProvider = new ethers.BrowserProvider(farcasterProvider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      
+      console.log('📝 Farcaster wallet connected:', await signer.getAddress());
+      console.log('🔥 Calling contract.submitScore directly...');
+      
+      const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
+        gasLimit: 200000,
+        maxFeePerGas: ethers.parseUnits("2", "gwei"),
+        maxPriorityFeePerGas: ethers.parseUnits("1", "gwei")
+      });
+      
+      console.log('✅ Transaction sent:', tx.hash);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
+      
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed:', receipt);
+      
+      // Refresh leaderboard
+      setTimeout(() => {
+        if (refetchLeaderboard) refetchLeaderboard();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Direct transaction failed:', error);
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        alert('Transaction cancelled by user');
+      } else if (error.message.includes('insufficient funds')) {
+        alert('❌ Insufficient ETH for gas fees on Base network.\n\n💡 You need a small amount of ETH on Base to pay gas fees.');
+      } else {
+        alert('❌ Transaction failed: ' + error.message);
+      }
+    }
   };
 
   // Legacy ethers.js submit function (fallback)
