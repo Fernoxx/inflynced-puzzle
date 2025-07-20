@@ -331,13 +331,47 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
-    // Use Wagmi v2's writeContract function
-    submitScore({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: 'submitScore',
-      args: [scoreInSeconds, username, puzzleId, fid],
-    });
+         // Use Wagmi v2's writeContract function with fallback
+     try {
+       console.log('🔥 Calling writeContract...');
+       submitScore({
+         address: CONTRACT_ADDRESS,
+         abi: CONTRACT_ABI,
+         functionName: 'submitScore',
+         args: [scoreInSeconds, username, puzzleId, fid],
+         chainId: base.id, // Explicitly set chain ID
+       });
+       console.log('✅ writeContract called successfully');
+     } catch (wagmiError) {
+       console.error('❌ Wagmi writeContract failed:', wagmiError);
+       console.log('🔄 Falling back to ethers.js method...');
+       
+       // Fallback to direct ethers.js call
+       try {
+         const { sdk } = await import('@farcaster/miniapp-sdk');
+         const farcasterProvider = sdk.wallet.ethProvider;
+         
+         if (!farcasterProvider) {
+           throw new Error('Farcaster wallet provider not available');
+         }
+
+         const ethersProvider = new ethers.BrowserProvider(farcasterProvider);
+         const signer = await ethersProvider.getSigner();
+         const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+         
+         console.log('🔥 Using ethers.js fallback...');
+         const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
+           gasLimit: 200000,
+         });
+         
+         console.log('✅ Ethers.js transaction sent:', tx.hash);
+         alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
+         
+       } catch (ethersError) {
+         console.error('❌ Ethers.js fallback also failed:', ethersError);
+         alert('Transaction failed: ' + ethersError.message);
+       }
+     }
   };
 
   // Legacy ethers.js submit function (fallback)
