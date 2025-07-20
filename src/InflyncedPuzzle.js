@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useContractWrite, useContractRead, useDisconnect, usePublicClient, useWaitForTransaction } from 'wagmi';
+import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
 
@@ -66,25 +66,20 @@ const InflyncedPuzzle = () => {
   const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
 
-  // Wagmi contract read hook for leaderboard
-  const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useContractRead({
+  // Wagmi v2 contract read hook for leaderboard
+  const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getTopScores',
     args: [50], // Get top 50 scores
-    enabled: true,
   });
 
-  // Wagmi contract write hook for submitting scores
-  const { data: submitTxData, write: submitScore, isLoading: isSubmittingWagmi } = useContractWrite({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'submitScore',
-  });
+  // Wagmi v2 contract write hook for submitting scores
+  const { data: submitTxHash, writeContract: submitScore, isPending: isSubmittingWagmi } = useWriteContract();
 
   // Wait for transaction confirmation
-  const { isLoading: isWaitingForTx, isSuccess: isTxSuccess } = useWaitForTransaction({
-    hash: submitTxData?.hash,
+  const { isLoading: isWaitingForTx, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
+    hash: submitTxHash,
   });
   
   // Legacy states for compatibility
@@ -96,18 +91,18 @@ const InflyncedPuzzle = () => {
   const timerRef = useRef(null);
   const snowflakesRef = useRef([]);
 
-  // Handle Wagmi transaction success
+  // Handle Wagmi v2 transaction success
   useEffect(() => {
-    if (isTxSuccess && submitTxData?.hash) {
-      console.log('✅ WAGMI Transaction confirmed:', submitTxData.hash);
-      alert(`Score submitted onchain! 🎉\n\nTransaction: ${submitTxData.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${submitTxData.hash}`);
+    if (isTxSuccess && submitTxHash) {
+      console.log('✅ WAGMI v2 Transaction confirmed:', submitTxHash);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${submitTxHash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${submitTxHash}`);
       
       // Refresh leaderboard
       setTimeout(() => {
         refetchLeaderboard();
       }, 3000);
     }
-  }, [isTxSuccess, submitTxData, refetchLeaderboard]);
+  }, [isTxSuccess, submitTxHash, refetchLeaderboard]);
 
   // Update onchain leaderboard when data changes
   useEffect(() => {
@@ -294,8 +289,11 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
-    // Use Wagmi's write function
+    // Use Wagmi v2's writeContract function
     submitScore({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'submitScore',
       args: [scoreInSeconds, username, puzzleId, fid],
     });
   };

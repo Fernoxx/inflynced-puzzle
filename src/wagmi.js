@@ -1,26 +1,14 @@
-import { configureChains, createConfig } from 'wagmi'
+import { createConfig, http } from 'wagmi'
 import { base } from 'wagmi/chains'
-import { jsonRpcProvider } from 'wagmi/providers/jsonRpc'
 import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector'
 
-// Reliable Base RPC endpoints
+// Reliable Base RPC endpoint
 const BASE_RPC_URL = 'https://base.blockpi.network/v1/rpc/public'
 
-const { chains, publicClient } = configureChains(
-  [base],
-  [
-    jsonRpcProvider({
-      rpc: (chain) => {
-        if (chain.id !== base.id) return null
-        return { http: BASE_RPC_URL }
-      }
-    })
-  ]
-)
-
 export const wagmiConfig = createConfig({
-  autoConnect: true,
+  chains: [base],
   connectors: [farcasterMiniApp()],
-  publicClient,
-  chains
+  transports: {
+    [base.id]: http(BASE_RPC_URL),
+  },
 })
