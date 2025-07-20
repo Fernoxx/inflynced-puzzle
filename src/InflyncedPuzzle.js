@@ -63,6 +63,16 @@ const InflyncedPuzzle = () => {
   // Wagmi hooks for wallet connection and contract interaction
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
+  
+  // Debug connectors on mount
+  useEffect(() => {
+    console.log('🔍 Available connectors:', connectors);
+    console.log('🔍 Wallet connected:', walletConnected);
+    console.log('🔍 Wallet address:', walletAddress);
+    connectors.forEach(connector => {
+      console.log(`🔗 Connector: ${connector.name} (id: ${connector.id})`);
+    });
+  }, [connectors, walletConnected, walletAddress]);
   const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
 
@@ -111,6 +121,24 @@ const InflyncedPuzzle = () => {
       setOnchainLeaderboard(onchainLeaderboardData);
     }
   }, [onchainLeaderboardData]);
+
+  // Initialize Farcaster SDK
+  useEffect(() => {
+    const initFarcaster = async () => {
+      try {
+        console.log('🔗 Initializing Farcaster SDK...');
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        await sdk.ready();
+        const context = await sdk.context;
+        console.log('✅ Farcaster SDK initialized:', context);
+        setUserProfile(context.user);
+      } catch (error) {
+        console.error('❌ Farcaster SDK initialization failed:', error);
+      }
+    };
+    
+    initFarcaster();
+  }, []);
 
   useEffect(() => {
     try {
@@ -269,12 +297,26 @@ const InflyncedPuzzle = () => {
 
 
   // New Wagmi-based submit function
-  const submitScoreWithWagmi = (time, puzzleId) => {
+  const submitScoreWithWagmi = async (time, puzzleId) => {
     console.log('🔥 WAGMI: submitScore called with proper RPC:', { time, puzzleId });
     
     if (!walletConnected || !walletAddress) {
-      alert('Please connect your wallet first');
-      return;
+      console.log('🔗 Wallet not connected, attempting to connect...');
+      try {
+        // Get Farcaster connector
+        const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+        if (farcasterConnector) {
+          await connectAsync({ connector: farcasterConnector });
+          console.log('✅ Farcaster wallet connected');
+        } else {
+          alert('Farcaster connector not found. Please ensure you are in Farcaster mobile app.');
+          return;
+        }
+      } catch (error) {
+        console.error('❌ Failed to connect wallet:', error);
+        alert('Failed to connect wallet: ' + error.message);
+        return;
+      }
     }
 
     const scoreInSeconds = Math.floor(time / 1000);
