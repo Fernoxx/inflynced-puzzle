@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
+import { useAccount, useConnect, useContractWrite, useContractRead, useDisconnect, usePublicClient } from 'wagmi';
+import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
-import { useAccount, useConnect, usePublicClient } from 'wagmi';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -28,7 +29,17 @@ const IMAGE_PUZZLES = [
 ];
 
 // Contract configuration for Base chain - USER'S ACTUAL CONTRACT
-const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || "0xff9760f655b3fcf73864def142df2a551c38f15e"; // Replace with your actual contract
+const CONTRACT_ADDRESS = "0xff9760f655b3fcf73864def142df2a551c38f15e";
+
+// Contract ABI with the correct function signatures
+const CONTRACT_ABI = [
+  "function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external",
+  "function getTopScores(uint256 limit) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
+  "function getUserScores(address user) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
+  "function getScoresCount() external view returns (uint256)",
+  "function getBestScore(address user) external view returns (uint256)",
+  "function getBestScoreForPuzzle(uint256 puzzleId) external view returns (uint256)"
+];
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
@@ -49,16 +60,19 @@ const InflyncedPuzzle = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showSnowEffect, setShowSnowEffect] = useState(false);
   
-  // Wagmi hooks for wallet connection
+  // Wagmi hooks for wallet connection and contract interaction
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
-  // const { sendTransaction } = useSendTransaction(); // Not used with ethers.js
-  // const { writeContract } = useWriteContract(); // Not used with ethers.js
+  const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
+
+  // For now, we'll keep the ethers.js approach and add Wagmi gradually
+  // TODO: Implement proper Wagmi contract hooks in next update
   
   // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
   const [isSubmittingOnchain, setIsSubmittingOnchain] = useState(false);
+  const [onchainLeaderboard, setOnchainLeaderboard] = useState([]);
   
   const audioContextRef = useRef(null);
   const timerRef = useRef(null);
@@ -220,9 +234,9 @@ const InflyncedPuzzle = () => {
 
 
 
-  // Submit score onchain using ethers.js
+  // Submit score onchain using Wagmi
   const submitScoreOnchain = async (time, puzzleId) => {
-    console.log('🔴 DEBUG: submitScoreOnchain called with:', { time, puzzleId });
+    console.log('🔴 DEBUG: submitScoreOnchain called with Wagmi:', { time, puzzleId });
     console.log('🔴 DEBUG: walletConnected:', walletConnected);
     console.log('🔴 DEBUG: walletAddress:', walletAddress);
     
