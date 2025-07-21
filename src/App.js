@@ -1,20 +1,22 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
+import './App.css';
 import InflyncedPuzzle from './InflyncedPuzzle';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { wagmiConfig } from './wagmi-config';
+import { wagmiConfig } from './wagmi';
 
 const queryClient = new QueryClient();
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
+function App() {
+  return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <InflyncedPuzzle />
+        <div className="App">
+          <InflyncedPuzzle />
+        </div>
       </QueryClientProvider>
     </WagmiProvider>
-  </React.StrictMode>
-);
+  );
+}
+
+export default App;
