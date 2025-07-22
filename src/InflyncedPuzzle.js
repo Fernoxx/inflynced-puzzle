@@ -39,26 +39,39 @@ const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
-// Load full leaderboard from new contract
+// Load full leaderboard from new contract using separate calls
 async function loadLeaderboard() {
   try {
     console.log("🔄 Loading onchain leaderboard from new contract:", CONTRACT_ADDRESS)
     
-    const leaderboard = await readContract(wagmiConfig, {
+    // First, get all player addresses
+    const playerAddresses = await readContract(wagmiConfig, {
       address: CONTRACT_ADDRESS,
       abi: leaderboardABI,
-      functionName: 'getAllLatestScores',
+      functionName: 'getPlayers',
     })
 
-    const [addresses, scores] = leaderboard;
+    console.log("✅ Player addresses loaded:", playerAddresses)
+
+    // Then, get each player's score
+    const scores = await Promise.all(
+      playerAddresses.map(addr =>
+        readContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: leaderboardABI,
+          functionName: 'getScore',
+          args: [addr],
+        })
+      )
+    )
     
     console.log("✅ Scores loaded from new contract:")
     scores.forEach((s, i) => {
-      console.log(`Player: ${addresses[i]}`);
+      console.log(`Player: ${playerAddresses[i]}`);
       console.log(`Puzzle: ${s.puzzleId}, Time: ${s.timeInSeconds}s, At: ${s.timestamp}`);
     });
     
-    return { addresses, scores }
+    return { addresses: playerAddresses, scores }
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
     return { addresses: [], scores: [] }
@@ -98,12 +111,12 @@ const InflyncedPuzzle = () => {
   const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
 
-  // Wagmi v2 contract read hook for leaderboard
+  // Wagmi v2 contract read hook for leaderboard - get players list
   const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: leaderboardABI,
-    functionName: 'getAllLatestScores',
-    // No args needed - getAllLatestScores() takes no parameters
+    functionName: 'getPlayers',
+    // No args needed - getPlayers() takes no parameters
   });
 
   // Wagmi v2 contract write hook for submitting scores
@@ -543,7 +556,7 @@ const InflyncedPuzzle = () => {
           
         } catch (contractError) {
           console.log('❌ Contract leaderboard call failed:', contractError);
-          console.log('💡 Make sure your contract has the getAllLatestScores function');
+          console.log('💡 Make sure your contract has the getPlayers and getScore functions');
         }
       }
       
