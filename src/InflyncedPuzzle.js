@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
-import { writeContract } from '@wagmi/core';
+import { writeContract, readContract } from '@wagmi/core';
 import { wagmiConfig } from './wagmi-config.js';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
@@ -38,6 +38,25 @@ const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f445
 const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
+
+// Load full leaderboard from new contract
+async function loadLeaderboard() {
+  try {
+    console.log("🔄 Loading onchain leaderboard from new contract:", CONTRACT_ADDRESS)
+    
+    const scores = await readContract(wagmiConfig, {
+      address: CONTRACT_ADDRESS,
+      abi: leaderboardABI,
+      functionName: 'getAllLatestScores',
+    })
+
+    console.log("✅ Scores loaded from new contract:", scores)
+    return scores
+  } catch (err) {
+    console.error("❌ Failed to load leaderboard:", err)
+    return []
+  }
+}
 
 const InflyncedPuzzle = () => {
   const [gameState, setGameState] = useState('menu');
