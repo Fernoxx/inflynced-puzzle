@@ -62,17 +62,18 @@ async function loadLeaderboard() {
 
       results.push({
         address,
-        puzzleId: Number(score.puzzleId),
-        time: Number(score.timeInSeconds),
-        timeInSeconds: Number(score.timeInSeconds), // Keep for compatibility
-        timestamp: Number(score.timestamp)
+        time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
+        timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
+        timestamp: Number(score.timestamp) || Number(score[2]) || 0,
+        puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
       });
     }
 
-    // Sort by fastest time (ascending)
-    const sortedResults = results.sort((a, b) => a.time - b.time);
+    // Filter out zero or broken entries and sort by fastest time (ascending)
+    const filteredResults = results.filter(entry => entry.time > 0 && !isNaN(entry.time));
+    const sortedResults = filteredResults.sort((a, b) => a.time - b.time);
     
-    console.log("✅ Onchain leaderboard (sorted):", sortedResults);
+    console.log("✅ Onchain leaderboard (filtered & sorted):", sortedResults);
     return sortedResults
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
@@ -1253,7 +1254,7 @@ const InflyncedPuzzle = () => {
                     marginBottom: '6px'
                   }}>
                     <span>Rank & Player</span>
-                    <span>Time & Puzzle</span>
+                    <span>Best Time</span>
                   </div>
                   {sharedLeaderboard.slice(0, 10).map((entry, index) => (
                     <div key={index} style={{
@@ -1282,6 +1283,21 @@ const InflyncedPuzzle = () => {
                         }}>
                           {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
                         </div>
+                        {/* Profile Picture */}
+                        {entry.address === currentUser?.address && currentUser?.pfpUrl ? (
+                          <img 
+                            src={currentUser.pfpUrl} 
+                            alt="Profile"
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              marginRight: '8px',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        ) : null}
+                        
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '11px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {entry.address === currentUser?.address && currentUser?.username 
@@ -1294,11 +1310,8 @@ const InflyncedPuzzle = () => {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', marginLeft: '8px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#ff5722', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#ff5722', fontFamily: 'monospace' }}>
                           {entry.time || entry.timeInSeconds}s
-                        </div>
-                        <div style={{ fontSize: '9px', color: '#666' }}>
-                          Puzzle #{entry.puzzleId}
                         </div>
                       </div>
                     </div>
