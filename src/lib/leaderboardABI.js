@@ -13,7 +13,11 @@ export const leaderboardABI = [
     "inputs": [],
     "name": "getPlayers",
     "outputs": [
-      { "internalType": "address[]", "name": "", "type": "address[]" }
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
     ],
     "stateMutability": "view",
     "type": "function"
@@ -21,24 +25,6 @@ export const leaderboardABI = [
   {
     "inputs": [{ "internalType": "address", "name": "player", "type": "address" }],
     "name": "getScore",
-    "outputs": [
-      {
-        "components": [
-          { "internalType": "uint256", "name": "puzzleId", "type": "uint256" },
-          { "internalType": "uint256", "name": "timeInSeconds", "type": "uint256" },
-          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
-        ],
-        "internalType": "struct Leaderboard.Score",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "name": "latestScores",
     "outputs": [
       { "internalType": "uint256", "name": "puzzleId", "type": "uint256" },
       { "internalType": "uint256", "name": "timeInSeconds", "type": "uint256" },

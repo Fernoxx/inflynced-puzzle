@@ -37,44 +37,38 @@ const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f445
 // Contract ABI - imported from the new ABI file
 const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
-const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
 // Load full leaderboard from new contract using separate calls
 async function loadLeaderboard() {
   try {
     console.log("🔄 Loading onchain leaderboard from new contract:", CONTRACT_ADDRESS)
     
-    // First, get all player addresses
     const playerAddresses = await readContract(wagmiConfig, {
       address: CONTRACT_ADDRESS,
       abi: leaderboardABI,
       functionName: 'getPlayers',
-    })
+    });
 
-    console.log("✅ Player addresses loaded:", playerAddresses)
-
-    // Then, get each player's score
     const scores = await Promise.all(
-      playerAddresses.map(addr =>
-        readContract(wagmiConfig, {
+      playerAddresses.map(async (addr) => {
+        const score = await readContract(wagmiConfig, {
           address: CONTRACT_ADDRESS,
           abi: leaderboardABI,
           functionName: 'getScore',
           args: [addr],
-        })
-      )
-    )
-    
-    console.log("✅ Scores loaded from new contract:")
-    scores.forEach((s, i) => {
-      console.log(`Player: ${playerAddresses[i]}`);
-      console.log(`Puzzle: ${s.puzzleId}, Time: ${s.timeInSeconds}s, At: ${s.timestamp}`);
-    });
-    
-    return { addresses: playerAddresses, scores }
+        });
+        return {
+          address: addr,
+          ...score,
+        };
+      })
+    );
+
+    console.log("✅ Leaderboard loaded:", scores);
+    return scores
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
-    return { addresses: [], scores: [] }
+    return []
   }
 }
 
@@ -534,26 +528,15 @@ const InflyncedPuzzle = () => {
       // Try to read from blockchain using wagmi
       let leaderboardData = [];
       
-      // Read leaderboard from YOUR contract
+      // Use the new loadLeaderboard function for onchain data
       if (publicClient && walletConnected) {
         try {
-          console.log('📖 Reading leaderboard from YOUR contract:', CONTRACT_ADDRESS);
-          
-          const result = await publicClient.call({
-            to: CONTRACT_ADDRESS,
-            data: GET_LEADERBOARD_SELECTOR
-          });
-          
-          console.log('📊 Contract leaderboard response:', result);
-          
-          if (result && result !== '0x') {
-            console.log('✅ Got data from contract - need to parse based on your contract ABI');
-            // TODO: Parse based on your actual contract's return format
-            // leaderboardData = parseYourContractData(result);
-          } else {
-            console.log('⚠️ Contract returned empty leaderboard');
+          console.log('📖 Loading leaderboard from new contract functions');
+          const onchainData = await loadLeaderboard();
+          if (onchainData && onchainData.length > 0) {
+            console.log('✅ Got onchain leaderboard data:', onchainData.length, 'entries');
+            leaderboardData = onchainData;
           }
-          
         } catch (contractError) {
           console.log('❌ Contract leaderboard call failed:', contractError);
           console.log('💡 Make sure your contract has the getPlayers and getScore functions');
