@@ -8,6 +8,7 @@ import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
+import { leaderboardABI, LEADERBOARD_CONTRACT_ADDRESS } from '../lib/leaderboardABI.js';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -28,18 +29,11 @@ const IMAGE_PUZZLES = [
   { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
-// Contract configuration for Base chain - USER'S ACTUAL CONTRACT
-const CONTRACT_ADDRESS = "0xff9760f655b3fcf73864def142df2a551c38f15e";
+// Contract configuration for Base chain - NEW LEADERBOARD CONTRACT
+const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f4450bbc45676259d152a0bc
 
-// Contract ABI with the correct function signatures
-const CONTRACT_ABI = [
-  "function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external",
-  "function getTopScores(uint256 limit) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
-  "function getUserScores(address user) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
-  "function getScoresCount() external view returns (uint256)",
-  "function getBestScore(address user) external view returns (uint256)",
-  "function getBestScoreForPuzzle(uint256 puzzleId) external view returns (uint256)"
-];
+// Contract ABI - imported from the new ABI file
+const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
 
