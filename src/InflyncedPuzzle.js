@@ -94,9 +94,9 @@ const InflyncedPuzzle = () => {
   // Wagmi v2 contract read hook for leaderboard
   const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getTopScores',
-    args: [50], // Get top 50 scores
+    abi: leaderboardABI,
+    functionName: 'getAllLatestScores',
+    // No args needed - getAllLatestScores() takes no parameters
   });
 
   // Wagmi v2 contract write hook for submitting scores
@@ -538,7 +538,7 @@ const InflyncedPuzzle = () => {
           
         } catch (contractError) {
           console.log('❌ Contract leaderboard call failed:', contractError);
-          console.log('💡 Make sure your contract has the getLeaderboard function');
+          console.log('💡 Make sure your contract has the getAllLatestScores function');
         }
       }
       
