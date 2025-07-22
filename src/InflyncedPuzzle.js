@@ -10,7 +10,7 @@ import { writeContract } from '@wagmi/core';
 import { wagmiConfig } from './wagmi-config.js';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
-import { leaderboardABI, LEADERBOARD_CONTRACT_ADDRESS } from '../lib/leaderboardABI.js';
+import { leaderboardABI, LEADERBOARD_CONTRACT_ADDRESS } from './lib/leaderboardABI.js';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
