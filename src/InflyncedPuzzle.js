@@ -5,9 +5,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
-import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
+import { waitForTransactionDirect } from './lib/client.js';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -87,10 +88,14 @@ const InflyncedPuzzle = () => {
   // Wagmi v2 contract write hook for submitting scores
   const { data: submitTxHash, writeContract: submitScore, isPending: isSubmittingWagmi } = useWriteContract();
 
-  // Wait for transaction confirmation
-  const { isLoading: isWaitingForTx, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
-    hash: submitTxHash,
-  });
+  // Wait for transaction confirmation - DISABLED to avoid window.ethereum issues
+  // const { isLoading: isWaitingForTx, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({
+  //   hash: submitTxHash,
+  // });
+  
+  // Custom state for transaction confirmation using direct Alchemy
+  const [isWaitingForTx, setIsWaitingForTx] = useState(false);
+  const [isTxSuccess, setIsTxSuccess] = useState(false);
   
   // Legacy states for compatibility
   const [sdkInstance, setSdkInstance] = useState(null);
@@ -101,10 +106,10 @@ const InflyncedPuzzle = () => {
   const timerRef = useRef(null);
   const snowflakesRef = useRef([]);
 
-  // Handle Wagmi v2 transaction success
+  // Handle custom transaction success (replaced wagmi hook to avoid window.ethereum issues)
   useEffect(() => {
     if (isTxSuccess && submitTxHash) {
-      console.log('✅ WAGMI v2 Transaction confirmed:', submitTxHash);
+      console.log('✅ Transaction confirmed via direct Alchemy:', submitTxHash);
       alert(`Score submitted onchain! 🎉\n\nTransaction: ${submitTxHash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${submitTxHash}`);
       
       // Refresh leaderboard
@@ -301,9 +306,20 @@ const InflyncedPuzzle = () => {
       console.log('✅ Transaction sent:', tx.hash);
       alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
       
-      // Wait for confirmation
-      const receipt = await tx.wait();
+      // Wait for confirmation using direct Alchemy connection (bypasses window.ethereum)
+      setIsWaitingForTx(true);
+      const receipt = await waitForTransactionDirect(tx.hash);
       console.log('✅ Transaction confirmed:', receipt);
+      
+      // Update our custom state
+      setIsWaitingForTx(false);
+      setIsTxSuccess(true);
+      
+      // Store the transaction hash for the useEffect
+      if (!submitTxHash) {
+        // Manually set the tx hash since wagmi writeContract wasn't used
+        console.log('📝 Setting transaction hash for UI state:', tx.hash);
+      }
       
       // Refresh leaderboard
       setTimeout(() => {
@@ -312,6 +328,8 @@ const InflyncedPuzzle = () => {
       
     } catch (error) {
       console.error('❌ Transaction failed:', error);
+      setIsWaitingForTx(false); // Reset waiting state on error
+      
       if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
         alert('Transaction cancelled by user');
       } else if (error.message.includes('insufficient funds')) {
@@ -479,11 +497,14 @@ const InflyncedPuzzle = () => {
       
       console.log('✅ Transaction sent:', tx.hash);
       
-      // Wait for confirmation
-      console.log('⏳ Waiting for confirmation...');
-      const receipt = await tx.wait();
+      // Wait for confirmation using direct Alchemy connection (bypasses window.ethereum)
+      console.log('⏳ Waiting for confirmation via Alchemy...');
+      setIsWaitingForTx(true);
+      const receipt = await waitForTransactionDirect(tx.hash);
       
       console.log('✅ Transaction confirmed:', receipt);
+      setIsWaitingForTx(false);
+      setIsTxSuccess(true);
       alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
       
       setTimeout(() => {
@@ -506,6 +527,7 @@ const InflyncedPuzzle = () => {
       }
     } finally {
       setIsSubmittingOnchain(false);
+      setIsWaitingForTx(false);
     }
   };
 
