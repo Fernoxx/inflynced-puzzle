@@ -38,33 +38,36 @@ const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f445
 const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 
-// Load full leaderboard from new contract using separate calls
+// Load full leaderboard from optimized contract
 async function loadLeaderboard() {
   try {
-    console.log("🔄 Loading onchain leaderboard from new contract:", CONTRACT_ADDRESS)
+    console.log("🔄 Loading onchain leaderboard from optimized contract:", CONTRACT_ADDRESS)
     
-    const playerAddresses = await readContract(wagmiConfig, {
+    const addresses = await readContract(wagmiConfig, {
       address: CONTRACT_ADDRESS,
       abi: leaderboardABI,
       functionName: 'getPlayers',
     });
 
     const scores = await Promise.all(
-      playerAddresses.map(async (addr) => {
+      addresses.map(async (addr) => {
         const score = await readContract(wagmiConfig, {
           address: CONTRACT_ADDRESS,
           abi: leaderboardABI,
           functionName: 'getScore',
           args: [addr],
         });
+
         return {
           address: addr,
-          ...score,
+          puzzleId: score.puzzleId,
+          timeInSeconds: score.timeInSeconds,
+          timestamp: score.timestamp,
         };
       })
     );
 
-    console.log("✅ Leaderboard loaded:", scores);
+    console.log("✅ Onchain leaderboard:", scores);
     return scores
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
