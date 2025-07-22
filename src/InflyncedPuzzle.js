@@ -44,17 +44,24 @@ async function loadLeaderboard() {
   try {
     console.log("🔄 Loading onchain leaderboard from new contract:", CONTRACT_ADDRESS)
     
-    const scores = await readContract(wagmiConfig, {
+    const leaderboard = await readContract(wagmiConfig, {
       address: CONTRACT_ADDRESS,
       abi: leaderboardABI,
       functionName: 'getAllLatestScores',
     })
 
-    console.log("✅ Scores loaded from new contract:", scores)
-    return scores
+    const [addresses, scores] = leaderboard;
+    
+    console.log("✅ Scores loaded from new contract:")
+    scores.forEach((s, i) => {
+      console.log(`Player: ${addresses[i]}`);
+      console.log(`Puzzle: ${s.puzzleId}, Time: ${s.timeInSeconds}s, At: ${s.timestamp}`);
+    });
+    
+    return { addresses, scores }
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
-    return []
+    return { addresses: [], scores: [] }
   }
 }
 
@@ -290,10 +297,8 @@ const InflyncedPuzzle = () => {
         abi: leaderboardABI,
         functionName: 'submitScore',
         args: [
-          scoreInSeconds,                         // time (uint256)
-          username || 'anonymous',                // username (string)
           puzzleId,                              // puzzleId (uint256)
-          fid || 0                               // fid (uint256)
+          scoreInSeconds                         // timeInSeconds (uint256)
         ],
       });
       
