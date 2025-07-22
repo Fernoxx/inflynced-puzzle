@@ -6,6 +6,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
+import { writeContract } from '@wagmi/core';
+import { wagmiConfig } from './wagmi-config.js';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
 import { leaderboardABI, LEADERBOARD_CONTRACT_ADDRESS } from '../lib/leaderboardABI.js';
@@ -245,15 +247,15 @@ const InflyncedPuzzle = () => {
 
 
 
-  // Proper Farcaster SDK approach with Ethereum wallet
+  // Updated wagmi v2 approach for score submission
   const submitScoreWithWagmi = async (time, puzzleId) => {
-    console.log('🔥 FARCASTER SDK: Using wallet provider for transaction:', { time, puzzleId });
+    console.log('🔥 WAGMI V2: Submitting score with new contract:', { time, puzzleId });
     
     const scoreInSeconds = Math.floor(time / 1000);
     const username = userProfile?.username || userProfile?.displayName || 'anonymous';
     const fid = userProfile?.fid || 0;
 
-    console.log('📝 Submitting score via Farcaster wallet:', {
+    console.log('📝 Submitting score with updated contract:', {
       contract: CONTRACT_ADDRESS,
       time: scoreInSeconds,
       puzzleId: puzzleId,
@@ -261,43 +263,25 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
-    // Ensure we're in Farcaster environment
-    if (!isInFarcaster || !sdkInstance) {
-      alert('❌ This app must be used within Farcaster mobile app');
-      return;
-    }
-
     try {
-      console.log('🔥 Getting Farcaster wallet provider...');
+      console.log('🔥 Using wagmi writeContract...');
       
-      // Use the SDK instance we already have
-      const walletProvider = await sdkInstance.wallet.getEthereumProvider();
-      
-      if (!walletProvider) {
-        throw new Error('❌ Farcaster wallet not available. Please ensure you have a wallet connected in Farcaster.');
-      }
-
-      console.log('✅ Using Farcaster wallet provider');
-      const ethersProvider = new ethers.BrowserProvider(walletProvider);
-      const signer = await ethersProvider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      
-      const signerAddress = await signer.getAddress();
-      console.log('📝 Farcaster wallet address:', signerAddress);
-      console.log('🔥 Calling contract.submitScore...');
-      
-      const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
-        gasLimit: 200000,
-        maxFeePerGas: ethers.parseUnits("2", "gwei"),
-        maxPriorityFeePerGas: ethers.parseUnits("1", "gwei")
+      const result = await writeContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: leaderboardABI,
+        functionName: 'submitScore',
+        args: [
+          scoreInSeconds,                         // time (uint256)
+          username || 'anonymous',                // username (string)
+          puzzleId,                              // puzzleId (uint256)
+          fid || 0                               // fid (uint256)
+        ],
       });
       
-      console.log('✅ Transaction sent:', tx.hash);
-      alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
+      console.log('✅ Transaction sent:', result);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${result.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${result}`);
       
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
+      console.log('✅ Score successfully submitted to new Leaderboard contract');
       
       // Refresh leaderboard
       setTimeout(() => {
