@@ -38,7 +38,7 @@ const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f445
 const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 
-// Load full leaderboard from optimized contract
+// Load full leaderboard from optimized contract with sorting
 async function loadLeaderboard() {
   try {
     console.log("🔄 Loading onchain leaderboard from optimized contract:", CONTRACT_ADDRESS)
@@ -49,26 +49,31 @@ async function loadLeaderboard() {
       functionName: 'getPlayers',
     });
 
-    const scores = await Promise.all(
-      addresses.map(async (addr) => {
-        const score = await readContract(wagmiConfig, {
-          address: CONTRACT_ADDRESS,
-          abi: leaderboardABI,
-          functionName: 'getScore',
-          args: [addr],
-        });
+    const results = [];
 
-        return {
-          address: addr,
-          puzzleId: score.puzzleId,
-          timeInSeconds: score.timeInSeconds,
-          timestamp: score.timestamp,
-        };
-      })
-    );
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      const score = await readContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: leaderboardABI,
+        functionName: 'getScore',
+        args: [address],
+      });
 
-    console.log("✅ Onchain leaderboard:", scores);
-    return scores
+      results.push({
+        address,
+        puzzleId: Number(score.puzzleId),
+        time: Number(score.timeInSeconds),
+        timeInSeconds: Number(score.timeInSeconds), // Keep for compatibility
+        timestamp: Number(score.timestamp)
+      });
+    }
+
+    // Sort by fastest time (ascending)
+    const sortedResults = results.sort((a, b) => a.time - b.time);
+    
+    console.log("✅ Onchain leaderboard (sorted):", sortedResults);
+    return sortedResults
   } catch (err) {
     console.error("❌ Failed to load leaderboard:", err)
     return []
@@ -86,6 +91,7 @@ const InflyncedPuzzle = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -172,6 +178,13 @@ const InflyncedPuzzle = () => {
         if (context?.user) {
           setUserProfile(context.user);
           setIsInFarcaster(true);
+          
+          // Set current user with Farcaster profile for leaderboard display
+          setCurrentUser({
+            address: walletAddress,
+            username: context.user.username,
+            pfpUrl: context.user.pfpUrl
+          });
         } else {
           console.log('❌ No user context - not in Farcaster');
           setIsInFarcaster(false);
@@ -1271,16 +1284,18 @@ const InflyncedPuzzle = () => {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '11px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {entry.username}
+                            {entry.address === currentUser?.address && currentUser?.username 
+                              ? `@${currentUser.username}` 
+                              : `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`}
                           </div>
                           <div style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>
-                            {entry.player}
+                            {entry.address === currentUser?.address ? '(You)' : entry.address}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', marginLeft: '8px' }}>
                         <div style={{ fontSize: '12px', fontWeight: '700', color: '#ff5722', fontFamily: 'monospace' }}>
-                          {entry.time}s
+                          {entry.time || entry.timeInSeconds}s
                         </div>
                         <div style={{ fontSize: '9px', color: '#666' }}>
                           Puzzle #{entry.puzzleId}
