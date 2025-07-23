@@ -38,35 +38,87 @@ const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f445
 const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 
-// Load full leaderboard from optimized contract with sorting
+// Helper function to add delay between requests
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to retry with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      // Check if it's a rate limit error (429)
+      const isRateLimit = error.message?.includes('429') || error.message?.includes('rate limit');
+      
+      if (isRateLimit && attempt < maxRetries) {
+        const delayTime = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`⏳ Rate limited, retrying in ${delayTime}ms (attempt ${attempt}/${maxRetries})`);
+        await delay(delayTime);
+        continue;
+      }
+      
+      throw error; // Re-throw if not rate limit or max retries reached
+    }
+  }
+}
+
+// Load full leaderboard from optimized contract with sorting and rate limiting
 async function loadLeaderboard() {
   try {
     console.log("🔄 Loading onchain leaderboard from optimized contract:", CONTRACT_ADDRESS)
     
-    const addresses = await readContract(wagmiConfig, {
-      address: CONTRACT_ADDRESS,
-      abi: leaderboardABI,
-      functionName: 'getPlayers',
+    // Get players with retry logic
+    const addresses = await retryWithBackoff(async () => {
+      return await readContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: leaderboardABI,
+        functionName: 'getPlayers',
+      });
     });
 
     const results = [];
+    const BATCH_SIZE = 3; // Process in smaller batches to avoid rate limits
+    const DELAY_BETWEEN_BATCHES = 500; // 500ms delay between batches
 
-    for (let i = 0; i < addresses.length; i++) {
-      const address = addresses[i];
-      const score = await readContract(wagmiConfig, {
-        address: CONTRACT_ADDRESS,
-        abi: leaderboardABI,
-        functionName: 'getScore',
-        args: [address],
-      });
+    // Process addresses in batches with delays
+    for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
+      const batch = addresses.slice(i, i + BATCH_SIZE);
+      
+      // Process batch in parallel but with retry logic for each
+      const batchResults = await Promise.all(
+        batch.map(async (address) => {
+          try {
+            const score = await retryWithBackoff(async () => {
+              return await readContract(wagmiConfig, {
+                address: CONTRACT_ADDRESS,
+                abi: leaderboardABI,
+                functionName: 'getScore',
+                args: [address],
+              });
+            });
 
-      results.push({
-        address,
-        time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
-        timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
-        timestamp: Number(score.timestamp) || Number(score[2]) || 0,
-        puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
-      });
+            return {
+              address,
+              time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
+              timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
+              timestamp: Number(score.timestamp) || Number(score[2]) || 0,
+              puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
+            };
+          } catch (err) {
+            console.warn(`⚠️ Failed to get score for ${address}:`, err.message);
+            return null; // Return null for failed entries
+          }
+        })
+      );
+
+      // Add successful results to main array
+      results.push(...batchResults.filter(result => result !== null));
+      
+      // Add delay between batches (except for the last batch)
+      if (i + BATCH_SIZE < addresses.length) {
+        console.log(`⏳ Processed batch ${Math.floor(i/BATCH_SIZE) + 1}, waiting ${DELAY_BETWEEN_BATCHES}ms...`);
+        await delay(DELAY_BETWEEN_BATCHES);
+      }
     }
 
     // Filter out zero or broken entries and sort by fastest time (ascending)
