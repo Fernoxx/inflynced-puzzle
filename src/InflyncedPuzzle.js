@@ -77,47 +77,36 @@ async function loadLeaderboard() {
     });
 
     const results = [];
-    const BATCH_SIZE = 3; // Process in smaller batches to avoid rate limits
-    const DELAY_BETWEEN_BATCHES = 500; // 500ms delay between batches
 
-    // Process addresses in batches with delays
-    for (let i = 0; i < addresses.length; i += BATCH_SIZE) {
-      const batch = addresses.slice(i, i + BATCH_SIZE);
+    // Process addresses with retry logic and slight delay for Alchemy
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
       
-      // Process batch in parallel but with retry logic for each
-      const batchResults = await Promise.all(
-        batch.map(async (address) => {
-          try {
-            const score = await retryWithBackoff(async () => {
-              return await readContract(wagmiConfig, {
-                address: CONTRACT_ADDRESS,
-                abi: leaderboardABI,
-                functionName: 'getScore',
-                args: [address],
-              });
-            });
+      try {
+        const score = await retryWithBackoff(async () => {
+          return await readContract(wagmiConfig, {
+            address: CONTRACT_ADDRESS,
+            abi: leaderboardABI,
+            functionName: 'getScore',
+            args: [address],
+          });
+        });
 
-            return {
-              address,
-              time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
-              timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
-              timestamp: Number(score.timestamp) || Number(score[2]) || 0,
-              puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
-            };
-          } catch (err) {
-            console.warn(`⚠️ Failed to get score for ${address}:`, err.message);
-            return null; // Return null for failed entries
-          }
-        })
-      );
+        results.push({
+          address,
+          time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
+          timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
+          timestamp: Number(score.timestamp) || Number(score[2]) || 0,
+          puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
+        });
 
-      // Add successful results to main array
-      results.push(...batchResults.filter(result => result !== null));
-      
-      // Add delay between batches (except for the last batch)
-      if (i + BATCH_SIZE < addresses.length) {
-        console.log(`⏳ Processed batch ${Math.floor(i/BATCH_SIZE) + 1}, waiting ${DELAY_BETWEEN_BATCHES}ms...`);
-        await delay(DELAY_BETWEEN_BATCHES);
+        // Add small delay between requests to avoid rate limits
+        if (i < addresses.length - 1) {
+          await delay(200); // 200ms delay as suggested
+        }
+      } catch (err) {
+        console.warn(`⚠️ Failed to get score for ${address}:`, err.message);
+        // Continue with next address
       }
     }
 
