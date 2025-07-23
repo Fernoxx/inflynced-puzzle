@@ -1297,7 +1297,7 @@ const InflyncedPuzzle = () => {
                     <span>Rank & Player</span>
                     <span>Best Time</span>
                   </div>
-                  {sharedLeaderboard.slice(0, 10).map((entry, index) => (
+                  {sharedLeaderboard.map((entry, index) => (
                     <div key={index} style={{
                       display: 'flex',
                       alignItems: 'center',
