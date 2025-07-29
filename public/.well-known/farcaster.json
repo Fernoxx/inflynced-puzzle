@@ -5,13 +5,13 @@
     "signature": "MHg1ZjllOWI2ZmVhZTJkMWIwMGQ5OWFlNTU3OTYyODgzYzZhMmViZDM0OTA5NGI5Y2IzNWJiOGRjN2Q2NTgzMzUwNjAxNDY0Y2ZhZjNhYmIyOWE3ZTc2OTQwZGQ4MzBhNzM2MDlkZjkwMzQyMDkyMTczNTEzZTk1MDMwOTNlNmVkZjFi"
   },
   "miniapp": {
-    "version": "v1",
+    "version": "vNext",
     "name": "InflyncedPuzzle",
-    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=3",
+    "iconUrl": "https://inflyncedpuzzle.vercel.app/icon.png?v=4",
     "homeUrl": "https://farcaster.xyz/miniapps/HUfrM_bUX-VR/inflyncedpuzzle",
-    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=3",
+    "imageUrl": "https://inflyncedpuzzle.vercel.app/og-image.png?v=4",
     "buttonTitle": "🧩 Play Puzzle",
-    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=3",
+    "splashImageUrl": "https://inflyncedpuzzle.vercel.app/splash.png?v=4",
     "splashBackgroundColor": "#B8460E",
     "features": {
       "wallet": {
