@@ -1,6 +1,5 @@
 import React from 'react';
 import './App.css';
-import InflyncedPuzzle from './InflyncedPuzzle';
 
 const queryClient = new QueryClient();
 
