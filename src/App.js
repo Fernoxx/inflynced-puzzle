@@ -7,7 +7,6 @@ function App() {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <div className="App">
         </div>
       </QueryClientProvider>
     </WagmiProvider>
