@@ -8,7 +8,6 @@ function App() {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         </div>
-      </QueryClientProvider>
     </WagmiProvider>
   );
 }
