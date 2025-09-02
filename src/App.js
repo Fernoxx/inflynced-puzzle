@@ -2,8 +2,7 @@ import React from 'react';
 import './App.css';
 
   return (
-        </div>
-    </WagmiProvider>
+        </div
   );
 }
 
