@@ -5,7 +5,6 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <WagmiProvider config={wagmiConfig}>
         </div>
     </WagmiProvider>
   );
