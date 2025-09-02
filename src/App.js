@@ -2,7 +2,6 @@ import React from 'react';
 import './App.css';
 import InflyncedPuzzle from './InflyncedPuzzle';
 import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient();
 
