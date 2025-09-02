@@ -1,7 +1,6 @@
 import React from 'react';
 import './App.css';
 import InflyncedPuzzle from './InflyncedPuzzle';
-import { WagmiProvider } from 'wagmi';
 
 const queryClient = new QueryClient();
 
