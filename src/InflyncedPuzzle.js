@@ -244,10 +244,6 @@ const InflyncedPuzzle = () => {
       } else if (error.message.includes('not found') || error.message.includes('connector')) {
         alert('⚠️ Farcaster wallet connector not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
       } else {
-        alert(`❌ Failed to connect Farcaster wallet: ${error.message}`);
-      }
-    }
-  };
 
 
 
