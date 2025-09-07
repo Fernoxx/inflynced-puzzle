@@ -7,7 +7,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
 import { base } from 'wagmi/chains';
-import { ethers } from 'ethers';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
