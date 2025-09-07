@@ -49,7 +49,6 @@ const InflyncedPuzzle = () => {
   const [isInFarcaster, setIsInFarcaster] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
-  const [showSnowEffect, setShowSnowEffect] = useState(false);
   
   // Wagmi hooks for wallet connection and contract interaction
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
