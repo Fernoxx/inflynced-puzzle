@@ -18,7 +18,6 @@ const IMAGE_PUZZLES = [
   { id: 8, image: "/images/puzzle8.jpg" },
   { id: 9, image: "/images/puzzle9.jpg" },
   { id: 10, image: "/images/puzzle10.jpg" },
-  { id: 11, image: "/images/puzzle11.jpg" },
   { id: 12, image: "/images/puzzle12.jpg" },
   { id: 13, image: "/images/puzzle13.jpg" },
   { id: 14, image: "/images/puzzle14.jpg" },
