@@ -31,7 +31,6 @@ const CONTRACT_ABI = [
   "function getTopScores(uint256 limit) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
   "function getUserScores(address user) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
   "function getScoresCount() external view returns (uint256)",
-  "function getBestScore(address user) external view returns (uint256)",
 ];
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
