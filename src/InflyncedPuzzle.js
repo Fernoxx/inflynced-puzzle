@@ -5,6 +5,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
+import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
+import { base } from 'wagmi/chains';
+import { ethers } from 'ethers';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -13,9 +16,12 @@ const IMAGE_PUZZLES = [
   { id: 3, image: "/images/puzzle3.jpg" },
   { id: 4, image: "/images/puzzle4.jpg" },
   { id: 5, image: "/images/puzzle5.jpg" },
+  { id: 6, image: "/images/puzzle6.jpg" },
   { id: 7, image: "/images/puzzle7.jpg" },
   { id: 8, image: "/images/puzzle8.jpg" },
+  { id: 9, image: "/images/puzzle9.jpg" },
   { id: 10, image: "/images/puzzle10.jpg" },
+  { id: 11, image: "/images/puzzle11.jpg" },
   { id: 12, image: "/images/puzzle12.jpg" },
   { id: 13, image: "/images/puzzle13.jpg" },
   { id: 14, image: "/images/puzzle14.jpg" },
@@ -30,6 +36,9 @@ const CONTRACT_ABI = [
   "function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external",
   "function getTopScores(uint256 limit) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
   "function getUserScores(address user) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
+  "function getScoresCount() external view returns (uint256)",
+  "function getBestScore(address user) external view returns (uint256)",
+  "function getBestScoreForPuzzle(uint256 puzzleId) external view returns (uint256)"
 ];
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
 const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
@@ -44,6 +53,12 @@ const InflyncedPuzzle = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [isInFarcaster, setIsInFarcaster] = useState(false);
+  const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showSnowEffect, setShowSnowEffect] = useState(false);
   
   // Wagmi hooks for wallet connection and contract interaction
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
@@ -229,6 +244,10 @@ const InflyncedPuzzle = () => {
       } else if (error.message.includes('not found') || error.message.includes('connector')) {
         alert('⚠️ Farcaster wallet connector not available\n\nPlease ensure you are using the latest version of Farcaster mobile app and try again.');
       } else {
+        alert(`❌ Failed to connect Farcaster wallet: ${error.message}`);
+      }
+    }
+  };
 
 
 
