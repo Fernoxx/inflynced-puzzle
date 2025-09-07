@@ -44,8 +44,6 @@ const InflyncedPuzzle = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [userProfile, setUserProfile] = useState(null);
-  const [isInFarcaster, setIsInFarcaster] = useState(false);
   
   // Wagmi hooks for wallet connection and contract interaction
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
