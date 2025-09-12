@@ -6,8 +6,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
+import { writeContract, readContract } from '@wagmi/core';
+import { wagmiConfig } from './wagmi-config.js';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
+import { leaderboardABI, LEADERBOARD_CONTRACT_ADDRESS } from './lib/leaderboardABI.js';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -28,20 +31,96 @@ const IMAGE_PUZZLES = [
   { id: 15, image: "/images/puzzle15.jpg" }
 ];
 
-// Contract configuration for Base chain - USER'S ACTUAL CONTRACT
-const CONTRACT_ADDRESS = "0xff9760f655b3fcf73864def142df2a551c38f15e";
+// Contract configuration for Base chain - NEW LEADERBOARD CONTRACT
+const CONTRACT_ADDRESS = LEADERBOARD_CONTRACT_ADDRESS; // 0xda19941b8bb505d9f4450bbc45676259d152a0bc
 
-// Contract ABI with the correct function signatures
-const CONTRACT_ABI = [
-  "function submitScore(uint256 time, string memory username, uint256 puzzleId, uint256 fid) external",
-  "function getTopScores(uint256 limit) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
-  "function getUserScores(address user) external view returns (tuple(address player, uint256 time, string username, uint256 puzzleId, uint256 timestamp, uint256 fid)[])",
-  "function getScoresCount() external view returns (uint256)",
-  "function getBestScore(address user) external view returns (uint256)",
-  "function getBestScoreForPuzzle(uint256 puzzleId) external view returns (uint256)"
-];
+// Contract ABI - imported from the new ABI file
+const CONTRACT_ABI = leaderboardABI;
 // const DEFAULT_CHAIN_ID = parseInt(process.env.REACT_APP_DEFAULT_CHAIN_ID || "8453"); // Base chain
-const GET_LEADERBOARD_SELECTOR = process.env.REACT_APP_GET_LEADERBOARD_FUNCTION_SELECTOR || "0x5dbf1c37";
+
+// Helper function to add delay between requests
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to retry with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      // Check if it's a rate limit error (429)
+      const isRateLimit = error.message?.includes('429') || error.message?.includes('rate limit');
+      
+      if (isRateLimit && attempt < maxRetries) {
+        const delayTime = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`⏳ Rate limited, retrying in ${delayTime}ms (attempt ${attempt}/${maxRetries})`);
+        await delay(delayTime);
+        continue;
+      }
+      
+      throw error; // Re-throw if not rate limit or max retries reached
+    }
+  }
+}
+
+// Load full leaderboard from optimized contract with sorting and rate limiting
+async function loadLeaderboard() {
+  try {
+    console.log("🔄 Loading onchain leaderboard from optimized contract:", CONTRACT_ADDRESS)
+    
+    // Get players with retry logic
+    const addresses = await retryWithBackoff(async () => {
+      return await readContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: leaderboardABI,
+        functionName: 'getPlayers',
+      });
+    });
+
+    const results = [];
+
+    // Process addresses with retry logic and slight delay for Alchemy
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+      
+      try {
+        const score = await retryWithBackoff(async () => {
+          return await readContract(wagmiConfig, {
+            address: CONTRACT_ADDRESS,
+            abi: leaderboardABI,
+            functionName: 'getScore',
+            args: [address],
+          });
+        });
+
+        results.push({
+          address,
+          time: Number(score.timeInSeconds) || Number(score[1]) || 0, // Fix NaN by trying multiple ways to parse
+          timeInSeconds: Number(score.timeInSeconds) || Number(score[1]) || 0, // Keep for compatibility
+          timestamp: Number(score.timestamp) || Number(score[2]) || 0,
+          puzzleId: Number(score.puzzleId) || Number(score[0]) || 0 // Keep for compatibility but not displayed
+        });
+
+        // Add small delay between requests to avoid rate limits
+        if (i < addresses.length - 1) {
+          await delay(200); // 200ms delay as suggested
+        }
+      } catch (err) {
+        console.warn(`⚠️ Failed to get score for ${address}:`, err.message);
+        // Continue with next address
+      }
+    }
+
+    // Filter out zero or broken entries and sort by fastest time (ascending)
+    const filteredResults = results.filter(entry => entry.time > 0 && !isNaN(entry.time));
+    const sortedResults = filteredResults.sort((a, b) => a.time - b.time);
+    
+    console.log("✅ Onchain leaderboard (filtered & sorted):", sortedResults);
+    return sortedResults
+  } catch (err) {
+    console.error("❌ Failed to load leaderboard:", err)
+    return []
+  }
+}
 
 const InflyncedPuzzle = () => {
   const [gameState, setGameState] = useState('menu');
@@ -54,6 +133,7 @@ const InflyncedPuzzle = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isInFarcaster, setIsInFarcaster] = useState(false);
   const [sharedLeaderboard, setSharedLeaderboard] = useState([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
@@ -76,12 +156,12 @@ const InflyncedPuzzle = () => {
   const { disconnect } = useDisconnect();
   const publicClient = usePublicClient();
 
-  // Wagmi v2 contract read hook for leaderboard
+  // Wagmi v2 contract read hook for leaderboard - get players list
   const { data: onchainLeaderboardData, refetch: refetchLeaderboard } = useReadContract({
     address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getTopScores',
-    args: [50], // Get top 50 scores
+    abi: leaderboardABI,
+    functionName: 'getPlayers',
+    // No args needed - getPlayers() takes no parameters
   });
 
   // Wagmi v2 contract write hook for submitting scores
@@ -140,6 +220,13 @@ const InflyncedPuzzle = () => {
         if (context?.user) {
           setUserProfile(context.user);
           setIsInFarcaster(true);
+          
+          // Set current user with Farcaster profile for leaderboard display
+          setCurrentUser({
+            address: walletAddress,
+            username: context.user.username,
+            pfpUrl: context.user.pfpUrl
+          });
         } else {
           console.log('❌ No user context - not in Farcaster');
           setIsInFarcaster(false);
@@ -251,15 +338,15 @@ const InflyncedPuzzle = () => {
 
 
 
-  // Proper Farcaster SDK approach with Ethereum wallet
+  // Updated wagmi v2 approach for score submission
   const submitScoreWithWagmi = async (time, puzzleId) => {
-    console.log('🔥 FARCASTER SDK: Using wallet provider for transaction:', { time, puzzleId });
+    console.log('🔥 WAGMI V2: Submitting score with new contract:', { time, puzzleId });
     
     const scoreInSeconds = Math.floor(time / 1000);
     const username = userProfile?.username || userProfile?.displayName || 'anonymous';
     const fid = userProfile?.fid || 0;
 
-    console.log('📝 Submitting score via Farcaster wallet:', {
+    console.log('📝 Submitting score with updated contract:', {
       contract: CONTRACT_ADDRESS,
       time: scoreInSeconds,
       puzzleId: puzzleId,
@@ -267,43 +354,23 @@ const InflyncedPuzzle = () => {
       fid: fid
     });
 
-    // Ensure we're in Farcaster environment
-    if (!isInFarcaster || !sdkInstance) {
-      alert('❌ This app must be used within Farcaster mobile app');
-      return;
-    }
-
     try {
-      console.log('🔥 Getting Farcaster wallet provider...');
+      console.log('🔥 Using wagmi writeContract...');
       
-      // Use the SDK instance we already have
-      const walletProvider = await sdkInstance.wallet.getEthereumProvider();
-      
-      if (!walletProvider) {
-        throw new Error('❌ Farcaster wallet not available. Please ensure you have a wallet connected in Farcaster.');
-      }
-
-      console.log('✅ Using Farcaster wallet provider');
-      const ethersProvider = new ethers.BrowserProvider(walletProvider);
-      const signer = await ethersProvider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      
-      const signerAddress = await signer.getAddress();
-      console.log('📝 Farcaster wallet address:', signerAddress);
-      console.log('🔥 Calling contract.submitScore...');
-      
-      const tx = await contract.submitScore(scoreInSeconds, username, puzzleId, fid, {
-        gasLimit: 200000,
-        maxFeePerGas: ethers.parseUnits("2", "gwei"),
-        maxPriorityFeePerGas: ethers.parseUnits("1", "gwei")
+      const result = await writeContract(wagmiConfig, {
+        address: CONTRACT_ADDRESS,
+        abi: leaderboardABI,
+        functionName: 'submitScore',
+        args: [
+          puzzleId,                              // puzzleId (uint256)
+          scoreInSeconds                         // timeInSeconds (uint256)
+        ],
       });
       
-      console.log('✅ Transaction sent:', tx.hash);
-      alert(`Score submitted onchain! 🎉\n\nTransaction: ${tx.hash.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${tx.hash}`);
+      console.log('✅ Transaction sent:', result);
+      alert(`Score submitted onchain! 🎉\n\nTransaction: ${result.slice(0, 10)}...\n\nView on Basescan: https://basescan.org/tx/${result}`);
       
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed:', receipt);
+      console.log('✅ Score successfully submitted to new Leaderboard contract');
       
       // Refresh leaderboard
       setTimeout(() => {
@@ -519,29 +586,18 @@ const InflyncedPuzzle = () => {
       // Try to read from blockchain using wagmi
       let leaderboardData = [];
       
-      // Read leaderboard from YOUR contract
+      // Use the new loadLeaderboard function for onchain data
       if (publicClient && walletConnected) {
         try {
-          console.log('📖 Reading leaderboard from YOUR contract:', CONTRACT_ADDRESS);
-          
-          const result = await publicClient.call({
-            to: CONTRACT_ADDRESS,
-            data: GET_LEADERBOARD_SELECTOR
-          });
-          
-          console.log('📊 Contract leaderboard response:', result);
-          
-          if (result && result !== '0x') {
-            console.log('✅ Got data from contract - need to parse based on your contract ABI');
-            // TODO: Parse based on your actual contract's return format
-            // leaderboardData = parseYourContractData(result);
-          } else {
-            console.log('⚠️ Contract returned empty leaderboard');
+          console.log('📖 Loading leaderboard from new contract functions');
+          const onchainData = await loadLeaderboard();
+          if (onchainData && onchainData.length > 0) {
+            console.log('✅ Got onchain leaderboard data:', onchainData.length, 'entries');
+            leaderboardData = onchainData;
           }
-          
         } catch (contractError) {
           console.log('❌ Contract leaderboard call failed:', contractError);
-          console.log('💡 Make sure your contract has the getLeaderboard function');
+          console.log('💡 Make sure your contract has the getPlayers and getScore functions');
         }
       }
       
@@ -1239,9 +1295,9 @@ const InflyncedPuzzle = () => {
                     marginBottom: '6px'
                   }}>
                     <span>Rank & Player</span>
-                    <span>Time & Puzzle</span>
+                    <span>Best Time</span>
                   </div>
-                  {sharedLeaderboard.slice(0, 10).map((entry, index) => (
+                  {sharedLeaderboard.map((entry, index) => (
                     <div key={index} style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1268,21 +1324,35 @@ const InflyncedPuzzle = () => {
                         }}>
                           {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
                         </div>
+                        {/* Profile Picture */}
+                        {entry.address === currentUser?.address && currentUser?.pfpUrl ? (
+                          <img 
+                            src={currentUser.pfpUrl} 
+                            alt="Profile"
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              marginRight: '8px',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        ) : null}
+                        
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '11px', fontWeight: '600', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {entry.username}
+                            {entry.address === currentUser?.address && currentUser?.username 
+                              ? `@${currentUser.username}` 
+                              : `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`}
                           </div>
                           <div style={{ fontSize: '9px', color: '#666', fontFamily: 'monospace' }}>
-                            {entry.player}
+                            {entry.address === currentUser?.address ? '(You)' : entry.address}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', marginLeft: '8px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: '#ff5722', fontFamily: 'monospace' }}>
-                          {entry.time}s
-                        </div>
-                        <div style={{ fontSize: '9px', color: '#666' }}>
-                          Puzzle #{entry.puzzleId}
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#ff5722', fontFamily: 'monospace' }}>
+                          {entry.time || entry.timeInSeconds}s
                         </div>
                       </div>
                     </div>

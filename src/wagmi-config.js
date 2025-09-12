@@ -16,6 +16,6 @@ export const wagmiConfig = createConfig({
     }),
   ],
   transports: {
-    [base.id]: http('https://mainnet.base.org'),
+    [base.id]: http("https://base-mainnet.g.alchemy.com/v2/Nh79Ld_o13xZoe6JCIrKF"),
   },
 });
