@@ -5,7 +5,6 @@ import { WagmiProvider } from 'wagmi';
 function App() {
   return (
         <div className="App">
-          <InflyncedPuzzle />
         </div>
   );
 }
