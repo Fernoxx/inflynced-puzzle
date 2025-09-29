@@ -3,7 +3,7 @@ import './App.css';
 import InflyncedPuzzle from './InflyncedPuzzle';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { wagmiConfig } from './wagmi';
+import { wagmiConfig } from './lib/reownConfig';
 
 const queryClient = new QueryClient();
 

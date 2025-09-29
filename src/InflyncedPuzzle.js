@@ -8,6 +8,7 @@ import { Play, Trophy, RefreshCw, Snowflake, Share2 } from 'lucide-react';
 import { useAccount, useConnect, useWriteContract, useReadContract, useDisconnect, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { ethers } from 'ethers';
+import ConnectWallet from './components/ConnectWallet';
 
 // Image-based puzzle configurations (15 puzzles)
 const IMAGE_PUZZLES = [
@@ -1334,6 +1335,11 @@ const InflyncedPuzzle = () => {
                   📱 Connect your Farcaster wallet to save scores on Base blockchain!
                 </div>
               )}
+              
+              {/* Enhanced Wallet Connection with Reown AppKit */}
+              <div style={{ marginBottom: '16px' }}>
+                <ConnectWallet />
+              </div>
               
               <button
                 onClick={startGame}
